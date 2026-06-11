@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VECTR — Industrial Workforce, Mobilized</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#9002;</text></svg>" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="webgl"></div>
+
+  <header class="site-header">
+    <nav class="nav-left">
+      <a href="#" class="nav-link">Our Industries</a>
+      <a href="#" class="nav-link">Our Mission</a>
+    </nav>
+    <a href="#" class="logo" aria-label="VECTR home">VECTR<span class="logo-mark">&rsaquo;</span></a>
+    <nav class="nav-right">
+      <a href="#" class="btn btn-light">Apply</a>
+      <a href="#" class="btn btn-dark">Request Crews</a>
+    </nav>
+  </header>
+
+  <aside class="steps" id="steps">
+    <article class="step" data-step="0">
+      <div class="step-row">
+        <span class="step-num">01</span>
+        <h2 class="step-title">Activation, simplified</h2>
+      </div>
+      <div class="step-body">
+        <p>One call triggers mobilization. Your requirements: craft, count,
+        and start date route directly to our verified crews. No hand-offs.
+        No escalations. Just boots on the ground in minutes.</p>
+      </div>
+    </article>
+    <article class="step" data-step="1">
+      <div class="step-row">
+        <span class="step-num">02</span>
+        <h2 class="step-title">Cleared to count</h2>
+      </div>
+      <div class="step-body">
+        <p>Our team handles all screening and verification before dispatch.
+        Compliance, background, certifications, and fitness-for-duty &mdash;
+        we enforce a zero-fail model to guarantee every worker clears the
+        gate on Day&nbsp;1.</p>
+      </div>
+    </article>
+    <article class="step" data-step="2">
+      <div class="step-row">
+        <span class="step-num">03</span>
+        <h2 class="step-title">Proven field match</h2>
+      </div>
+      <div class="step-body">
+        <p>We don&rsquo;t just provide available workers. We deploy proven crews.
+        By filtering for paid performance, role fit, and reliability, we
+        deliver teams engineered for endurance &mdash; ensuring your project
+        stays fully manned from first break to completion.</p>
+      </div>
+    </article>
+    <article class="step" data-step="3">
+      <div class="step-row">
+        <span class="step-num">04</span>
+        <h2 class="step-title">Seamless arrival</h2>
+      </div>
+      <div class="step-body">
+        <p>We manage the &ldquo;last mile&rdquo; of mobilization. Every crew arrives
+        site-ready with finalized reporting details. With real-time arrival
+        monitoring and active coordination, we ensure your shift starts on
+        time, even when field conditions shift.</p>
+      </div>
+    </article>
+  </aside>
+
+  <div class="scroll-space" aria-hidden="true"></div>
+
+  <script src="vendor/gsap.min.js"></script>
+  <script src="vendor/ScrollTrigger.min.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.min.js" } }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
