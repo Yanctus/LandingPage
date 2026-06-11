@@ -61,9 +61,9 @@ body {
 .nav-link:hover { opacity: 1; }
 
 .logo {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.06em;
   color: var(--ink);
   text-decoration: none;
   display: flex;

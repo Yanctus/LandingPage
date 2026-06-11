@@ -140,15 +140,17 @@ const curve = new THREE.CatmullRomCurve3(
     new THREE.Vector3(116, 0.5, 9),
     new THREE.Vector3(128, 0.5, 13),
     new THREE.Vector3(140, 0.5, 14), /* across the pitch centre */
-    new THREE.Vector3(150, 0.5, 13),
-    new THREE.Vector3(157, 0.6, 6),
-    new THREE.Vector3(160.5, 3.0, -2), /* climbing over the grandstand seats */
-    new THREE.Vector3(164, 0.6, -7),
-    new THREE.Vector3(178, 0.5, -5),
-    new THREE.Vector3(192, 0.5, -1),
-    new THREE.Vector3(205, 0.5, 8), /* into the trophy */
-    new THREE.Vector3(220, 0.5, 10),
-    new THREE.Vector3(236, 0.5, 11),
+    new THREE.Vector3(152, 0.5, 14),
+    new THREE.Vector3(160.6, 0.5, 14), /* right through the east goal */
+    new THREE.Vector3(172, 0.5, 11),
+    new THREE.Vector3(186, 0.5, 8),
+    new THREE.Vector3(197, 0.5, 7),
+    new THREE.Vector3(202, 4.5, 7.5),
+    new THREE.Vector3(205, 11.2, 8), /* leaps up into the cup... */
+    new THREE.Vector3(208, 4.5, 9), /* ...and back out */
+    new THREE.Vector3(213, 0.5, 9.5),
+    new THREE.Vector3(226, 0.5, 10),
+    new THREE.Vector3(239, 0.5, 11),
     MEMBER.clone(), /* the member's tile: centre of the grid */
   ],
   false,
@@ -340,7 +342,11 @@ function pitchTexture() {
   }
 }
 
-/* --- grandstand on the north side, the beam sweeps over the seats ----- */
+/* --- spectators in loose clusters + trees ------------------------------ */
+const peopleMat = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, roughness: 0.9 });
+const peopleMat2 = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.9 });
+
+/* --- grandstand, aligned flush with the pitch's north touchline -------- */
 function grandstand(cx, frontZ, length, rows) {
   const g = new THREE.Group();
   const seatW = 0.72;
@@ -354,18 +360,29 @@ function grandstand(cx, frontZ, length, rows) {
       const sx = -length / 2 + 0.9 + i * 1.35;
       const mat = Math.random() < 0.12 ? MAT.blue : MAT.white;
       g.add(box(seatW, 0.55, 0.6, mat, sx, y + 0.875, z - frontZ - 0.35));
+      /* a seated supporter on some of the seats */
+      if (Math.random() < 0.38) {
+        const pm = Math.random() < 0.4 ? peopleMat2 : peopleMat;
+        const fan = new THREE.Group();
+        const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.3, 4, 8), pm);
+        torso.position.y = 0.3;
+        torso.castShadow = true;
+        fan.add(torso);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), pm);
+        head.position.y = 0.72;
+        fan.add(head);
+        fan.position.set(sx, y + 1.15, z - frontZ - 0.35);
+        g.add(fan);
+      }
     }
   }
-  /* back wall + side walls */
+  /* back wall */
   g.add(box(length, rows * 0.6 + 1.6, 0.5, MAT.white, 0, (rows * 0.6 + 1.6) / 2, -rows * 1.6 - 0.5));
   g.position.set(cx, 0, frontZ);
   world.add(g);
 }
-grandstand(146, -1, 36, 6);
-
-/* --- spectators in loose clusters + trees ------------------------------ */
-const peopleMat = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, roughness: 0.9 });
-const peopleMat2 = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.9 });
+/* same centre + length as the pitch, sitting right on the touchline */
+grandstand(FIELD.x, FIELD.z - FIELD.wid / 2 - 1.2, FIELD.len, 6);
 function person(x, z, s = 1, mat = peopleMat) {
   const g = new THREE.Group();
   const bodyM = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * s, 0.5 * s, 4, 8), mat);
@@ -474,26 +491,35 @@ function trophy(x, z) {
 trophy(205, 8);
 
 /* --- member tile field (finale) ---------------------------------------- */
+/* a complete 5x5 square; the member's tile is the exact centre cell.
+   every surrounding tile gets its own material so the outward pulse can
+   lift it and flash it as the wave passes through. */
 const tileGeo = new THREE.BoxGeometry(7.2, 1.0, 7.2);
-function tileField(cx, cz, nx, nz, skip, skipCells = []) {
-  const g = new THREE.Group();
-  for (let i = 0; i < nx; i++) {
-    for (let j = 0; j < nz; j++) {
-      if (skipCells.some(([si, sj]) => si === i && sj === j)) continue;
-      if (Math.random() < skip) continue;
-      const raised = Math.random() < 0.07;
-      const t = new THREE.Mesh(tileGeo, raised ? MAT.white : MAT.light);
-      t.position.set(cx + (i - (nx - 1) / 2) * 8.4, raised ? 1.1 : 0.5, cz + (j - (nz - 1) / 2) * 8.4);
+const finaleTiles = [];
+{
+  const N = 5;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i === 2 && j === 2) continue; /* centre = the member's tile */
+      const mat = MAT.light.clone();
+      const t = new THREE.Mesh(tileGeo, mat);
+      const x = MEMBER.x + (i - (N - 1) / 2) * 8.4;
+      const z = MEMBER.z + (j - (N - 1) / 2) * 8.4;
+      t.position.set(x, 0.5, z);
       t.castShadow = true;
       t.receiveShadow = true;
-      g.add(t);
+      world.add(t);
+      finaleTiles.push({
+        mesh: t,
+        mat,
+        dist: Math.hypot(x - MEMBER.x, z - MEMBER.z),
+      });
     }
   }
-  world.add(g);
-  return g;
 }
-/* the member's tile is the CENTRE cell (2,2) of a 5x5 grid */
-tileField(MEMBER.x, MEMBER.z, 5, 5, 0.06, [[2, 2]]);
+const tileEmissiveBase = new THREE.Color(0xdde6f0);
+const tileEmissiveFlash = new THREE.Color(0x9fd8ff);
+const tileEmissiveTmp = new THREE.Color();
 
 const memberRings = (() => {
   /* the member's tile: blue, with a figure standing on it */
@@ -544,8 +570,41 @@ const memberRings = (() => {
     scene.add(ring);
     rings.push(ring);
   }
+  rings.figure = member;
   return rings;
 })();
+
+/* --- confetti fountain above the member (club colours) ----------------- */
+const CONFETTI = 130;
+const confetti = (() => {
+  const geo = new THREE.PlaneGeometry(0.26, 0.38);
+  const mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const mesh = new THREE.InstancedMesh(geo, mat, CONFETTI);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const palette = [0x2b2bd6, 0xffffff, 0x66ccff, 0xff6a72, 0xdfe6ee];
+  const color = new THREE.Color();
+  const data = [];
+  for (let i = 0; i < CONFETTI; i++) {
+    mesh.setColorAt(i, color.setHex(palette[i % palette.length]));
+    data.push({
+      angle: Math.random() * Math.PI * 2,
+      radial: 1.5 + Math.random() * 5.5,
+      up: 7 + Math.random() * 5,
+      phase: Math.random(),
+      speed: 0.4 + Math.random() * 0.25,
+      spinX: (Math.random() - 0.5) * 9,
+      spinY: (Math.random() - 0.5) * 9,
+    });
+  }
+  mesh.visible = false;
+  scene.add(mesh);
+  return { mesh, data };
+})();
+const confM4 = new THREE.Matrix4();
+const confQ = new THREE.Quaternion();
+const confE = new THREE.Euler();
+const confP = new THREE.Vector3();
+const confS = new THREE.Vector3();
 
 /* small filler blocks scattered along the route */
 for (let i = 0; i < 22; i++) {
@@ -556,7 +615,7 @@ for (let i = 0; i < 22; i++) {
   const x = p.x + Math.cos(a) * r;
   const z = p.z + Math.sin(a) * r;
   if (Math.abs(x - FIELD.x) < 32 && Math.abs(z - FIELD.z) < 24) continue;
-  if (x > 124 && x < 168 && z > -14 && z < 2) continue; /* grandstand */
+  if (x > 114 && x < 166 && z > -14 && z < 2) continue; /* grandstand */
   const s = 1.5 + Math.random() * 3;
   world.add(box(s, 0.8 + Math.random() * 2.4, s, MAT.light, x, null, z, Math.random()));
 }
@@ -808,9 +867,9 @@ const camKeys = [
   { p: 0.12, az: 2.6, el: 0.65, dist: 112 },
   { p: 0.29, az: 2.7, el: 0.78, dist: 100 }, /* company HQ */
   { p: 0.45, az: 2.35, el: 0.8, dist: 105 }, /* clubhouse */
-  { p: 0.58, az: 2.5, el: 1.0, dist: 130 }, /* pitch, near top-down */
-  { p: 0.68, az: 2.35, el: 0.7, dist: 95 }, /* grandstand */
-  { p: 0.82, az: 2.2, el: 0.6, dist: 92 }, /* trophy, low + close */
+  { p: 0.57, az: 2.5, el: 1.0, dist: 130 }, /* pitch, near top-down */
+  { p: 0.7, az: 2.35, el: 0.78, dist: 102 }, /* out through the goal */
+  { p: 0.82, az: 2.2, el: 0.66, dist: 96 }, /* trophy leap, low + close */
   { p: 0.93, az: 2.3, el: 0.76, dist: 100 },
   { p: 1.0, az: 2.1, el: 0.82, dist: 112 }, /* member tile finale */
 ];
@@ -897,12 +956,56 @@ function tick() {
 
   /* member halo: staggered rings pulsing outward once the beam arrives */
   const arrive = THREE.MathUtils.smoothstep(p, 0.94, 1);
+  const ringRadii = [];
+  const ringStrengths = [];
   for (let i = 0; i < memberRings.length; i++) {
     const ring = memberRings[i];
     const phase = ((time * 0.42 + i / memberRings.length) % 1 + 1) % 1;
     const spread = 5 + phase * 30;
     ring.scale.setScalar(Math.max(spread * arrive, 0.001));
     ring.material.opacity = arrive * Math.pow(1 - phase, 1.6) * 0.6;
+    ringRadii.push(spread / 2); /* the texture ring sits at half the plane size */
+    ringStrengths.push(Math.pow(1 - phase, 1.6));
+  }
+
+  /* the surrounding tiles ride the wave: lift + flash as each pulse passes */
+  for (const tile of finaleTiles) {
+    let bump = 0;
+    for (let r = 0; r < ringRadii.length; r++) {
+      const d = tile.dist - ringRadii[r];
+      bump += Math.exp(-(d * d) / 7) * ringStrengths[r];
+    }
+    bump = Math.min(bump, 1) * arrive;
+    tile.mesh.position.y = 0.5 + bump * 1.25;
+    tile.mat.emissiveIntensity = 0.18 + bump * 0.65;
+    tileEmissiveTmp.lerpColors(tileEmissiveBase, tileEmissiveFlash, bump);
+    tile.mat.emissive.copy(tileEmissiveTmp);
+  }
+
+  /* the member celebrates: gentle bounce + confetti fountain */
+  const memberFig = memberRings.figure;
+  if (memberFig) {
+    memberFig.scale.setScalar(1 + arrive * 0.07 * Math.max(Math.sin(time * 3.4), 0));
+  }
+  confetti.mesh.visible = arrive > 0.01;
+  if (confetti.mesh.visible) {
+    for (let i = 0; i < CONFETTI; i++) {
+      const d = confetti.data[i];
+      const u = ((time * d.speed + d.phase) % 1 + 1) % 1;
+      const y = 1.6 + d.up * u - 7.5 * u * u;
+      confP.set(
+        MEMBER.x + Math.cos(d.angle) * d.radial * u,
+        Math.max(y, 0.25),
+        MEMBER.z + Math.sin(d.angle) * d.radial * u
+      );
+      confE.set(time * d.spinX + i, time * d.spinY, 0);
+      confQ.setFromEuler(confE);
+      const fade = arrive * (y > 0.3 ? 1 - u * 0.35 : 0);
+      confS.setScalar(Math.max(fade, 0.001));
+      confM4.compose(confP, confQ, confS);
+      confetti.mesh.setMatrixAt(i, confM4);
+    }
+    confetti.mesh.instanceMatrix.needsUpdate = true;
   }
 
   const ck = camAt(p);
