@@ -69,7 +69,6 @@ const MAT = {
   }),
   trunk: new THREE.MeshStandardMaterial({ color: 0xcfc4b8, roughness: 0.95 }),
   leaf: new THREE.MeshStandardMaterial({ color: 0xaccbad, roughness: 0.95, emissive: 0x9dbd9e, emissiveIntensity: 0.15 }),
-  grass: new THREE.MeshStandardMaterial({ color: 0xd4e5d5, roughness: 1 }),
 };
 
 function box(w, h, d, mat, x = 0, y = null, z = 0, ry = 0) {
@@ -121,30 +120,36 @@ scene.add(ground);
 
 /* ------------------------------------------------------------------ */
 /*  The main route: junction -> company HQ -> clubhouse -> pitch ->    */
-/*  trophy -> member tile                                              */
+/*  grandstand -> trophy -> member tile                                */
 /* ------------------------------------------------------------------ */
 
 const JUNCTION = new THREE.Vector3(16, 0.5, 6);
+const FIELD = { x: 140, z: 14, len: 42, wid: 27 };
+const MEMBER = new THREE.Vector3(252, 0.5, 14);
 
 const curve = new THREE.CatmullRomCurve3(
   [
     JUNCTION.clone(),
-    new THREE.Vector3(26, 0.5, 8),
-    new THREE.Vector3(38, 0.5, 6),
-    new THREE.Vector3(46, 0.5, 6), /* through the company building */
-    new THREE.Vector3(56, 0.5, 8),
-    new THREE.Vector3(72, 0.5, 2),
-    new THREE.Vector3(88, 0.5, 6),
-    new THREE.Vector3(98, 0.5, 10), /* past the clubhouse */
-    new THREE.Vector3(112, 0.5, 14),
-    new THREE.Vector3(130, 0.5, 14), /* across the pitch */
-    new THREE.Vector3(150, 0.5, 14),
-    new THREE.Vector3(168, 0.5, 8),
-    new THREE.Vector3(188, 0.5, 4),
+    new THREE.Vector3(28, 0.5, 9),
+    new THREE.Vector3(42, 0.5, 5),
+    new THREE.Vector3(56, 0.5, 6),
+    new THREE.Vector3(66, 0.5, 6), /* straight through the HQ entrance */
+    new THREE.Vector3(76, 0.5, 7),
+    new THREE.Vector3(90, 0.5, 3),
+    new THREE.Vector3(104, 0.5, 4), /* through the clubhouse */
+    new THREE.Vector3(116, 0.5, 9),
+    new THREE.Vector3(128, 0.5, 13),
+    new THREE.Vector3(140, 0.5, 14), /* across the pitch centre */
+    new THREE.Vector3(150, 0.5, 13),
+    new THREE.Vector3(157, 0.6, 6),
+    new THREE.Vector3(160.5, 3.0, -2), /* climbing over the grandstand seats */
+    new THREE.Vector3(164, 0.6, -7),
+    new THREE.Vector3(178, 0.5, -5),
+    new THREE.Vector3(192, 0.5, -1),
     new THREE.Vector3(205, 0.5, 8), /* into the trophy */
-    new THREE.Vector3(222, 0.5, 8),
-    new THREE.Vector3(238, 0.5, 10),
-    new THREE.Vector3(253.4, 0.5, 14), /* the member's tile */
+    new THREE.Vector3(220, 0.5, 10),
+    new THREE.Vector3(236, 0.5, 11),
+    MEMBER.clone(), /* the member's tile: centre of the grid */
   ],
   false,
   "catmullrom",
@@ -162,11 +167,10 @@ scene.add(world);
 function skyscraper(x, z, w, h, d, ry = 0) {
   const g = new THREE.Group();
   g.add(box(w, h, d, MAT.white));
-  /* window strips */
   for (let yy = 2.2; yy < h - 1.2; yy += 2.2) {
     g.add(box(w + 0.12, 0.38, d + 0.12, MAT.dark, 0, yy, 0));
   }
-  g.add(box(w + 0.5, 0.6, d + 0.5, MAT.grey, 0, h + 0.3, 0)); /* roof slab */
+  g.add(box(w + 0.5, 0.6, d + 0.5, MAT.grey, 0, h + 0.3, 0));
   if (h > 20) g.add(box(w * 0.45, 2.2, d * 0.45, MAT.light, w * 0.1, h + 1.7, -d * 0.1));
   g.position.set(x, 0, z);
   g.rotation.y = ry;
@@ -191,16 +195,24 @@ for (let i = 0; i < 14; i++) {
   world.add(box(2.5 + Math.random() * 3.5, 1.5 + Math.random() * 4, 2.5 + Math.random() * 3.5, MAT.light, x, null, z, Math.random() * 0.4));
 }
 
-/* --- company HQ with logo ------------------------------------------- */
+/* --- company HQ with logo and a real entrance ----------------------- */
 function buildHQ() {
   const g = new THREE.Group();
   g.add(box(9, 11, 9, MAT.white, 0, null, 0));
-  g.add(box(6, 7.5, 6, MAT.light, -6.5, null, 1.5));
-  g.add(box(5, 5, 6, MAT.light, 6.2, null, -1.5));
+  /* annexes kept clear of the beam, which passes through along x */
+  g.add(box(6, 7.5, 6, MAT.light, -5.5, null, -7.5));
+  g.add(box(5, 5, 6, MAT.light, 5.8, null, -7));
   g.add(box(9.6, 0.7, 9.6, MAT.grey, 0, 11.1, 0));
 
+  /* window strips above the ground floor */
   for (let i = 0; i < 4; i++) {
-    g.add(box(9.12, 0.35, 9.12, MAT.dark, 0, 2.6 + i * 2.2, 0));
+    g.add(box(9.12, 0.35, 9.12, MAT.dark, 0, 3.6 + i * 2.0, 0));
+  }
+
+  /* entrance + exit portals at ground level: the beam runs through them */
+  for (const sgn of [-1, 1]) {
+    g.add(box(0.5, 3.2, 4.6, MAT.grey, sgn * 4.45, 1.6, 0)); /* portal frame */
+    g.add(box(0.4, 2.7, 3.4, MAT.dark, sgn * 4.75, 1.35, 0)); /* dark doorway */
   }
 
   /* logo panel (placeholder mark — swap the canvas drawing for the real logo) */
@@ -233,13 +245,13 @@ function buildHQ() {
   emblem.position.set(2.2, 7.4, 4.56);
   g.add(emblem);
 
-  g.position.set(46, 0, 1.5);
+  g.position.set(66, 0, 6);
   return g;
 }
 world.add(buildHQ());
 
-/* --- clubhouse (Vereinsheim) ---------------------------------------- */
-function clubhouse(x, z, ry = 0) {
+/* --- clubhouse (Vereinsheim), beam passes through it ------------------ */
+function clubhouse(x, z) {
   const g = new THREE.Group();
   g.add(box(10, 3.4, 6.5, MAT.white));
   const roof = new THREE.Mesh(prismGeometry(6.9, 2.2, 10.4), MAT.light);
@@ -248,11 +260,15 @@ function clubhouse(x, z, ry = 0) {
   roof.castShadow = true;
   roof.receiveShadow = true;
   g.add(roof);
-  /* terrace + door */
+  /* terrace + front door + windows on the pitch side */
   g.add(box(10.6, 0.3, 2.4, MAT.grey, 0, 0.15, 4.3));
-  g.add(box(1.4, 2.2, 0.15, MAT.dark, 0, 1.1, 3.3));
-  g.add(box(1.6, 0.9, 0.12, MAT.dark, -3, 1.9, 3.3));
-  g.add(box(1.6, 0.9, 0.12, MAT.dark, 3, 1.9, 3.3));
+  g.add(box(1.4, 2.2, 0.15, MAT.dark, -2.2, 1.1, 3.3));
+  g.add(box(1.6, 0.9, 0.12, MAT.dark, 1.6, 1.9, 3.3));
+  g.add(box(1.6, 0.9, 0.12, MAT.dark, 3.6, 1.9, 3.3));
+  /* pass-through doorways for the beam (west + east gable walls) */
+  for (const sgn of [-1, 1]) {
+    g.add(box(0.3, 2.4, 2.0, MAT.dark, sgn * 5.05, 1.2, 0));
+  }
   /* flag pole */
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 6.5, 8), MAT.grey);
   pole.position.set(6.4, 3.25, 4);
@@ -260,14 +276,11 @@ function clubhouse(x, z, ry = 0) {
   g.add(pole);
   g.add(box(1.7, 1.0, 0.06, MAT.blue, 7.3, 6, 4));
   g.position.set(x, 0, z);
-  g.rotation.y = ry;
   world.add(g);
 }
-clubhouse(96, 2.5, 0.1);
+clubhouse(104, 4);
 
 /* --- football pitch --------------------------------------------------- */
-const FIELD = { x: 131, z: 14, len: 42, wid: 27 };
-
 function pitchTexture() {
   const c = document.createElement("canvas");
   c.width = 840;
@@ -275,7 +288,6 @@ function pitchTexture() {
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#cfe3d0";
   ctx.fillRect(0, 0, 840, 540);
-  /* subtle mowing stripes */
   for (let i = 0; i < 10; i++) {
     if (i % 2) continue;
     ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -291,7 +303,6 @@ function pitchTexture() {
   ctx.beginPath();
   ctx.arc(420, 270, 70, 0, Math.PI * 2);
   ctx.stroke();
-  /* penalty boxes */
   ctx.strokeRect(20, 140, 120, 260);
   ctx.strokeRect(700, 140, 120, 260);
   ctx.strokeRect(20, 200, 50, 140);
@@ -312,7 +323,6 @@ function pitchTexture() {
   pitch.receiveShadow = true;
   world.add(pitch);
 
-  /* goals */
   const goalMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
   for (const gx of [FIELD.x - FIELD.len / 2 + 0.4, FIELD.x + FIELD.len / 2 - 0.4]) {
     const goal = new THREE.Group();
@@ -330,7 +340,30 @@ function pitchTexture() {
   }
 }
 
-/* --- spectators along the touchlines + a few trees -------------------- */
+/* --- grandstand on the north side, the beam sweeps over the seats ----- */
+function grandstand(cx, frontZ, length, rows) {
+  const g = new THREE.Group();
+  const seatW = 0.72;
+  for (let j = 0; j < rows; j++) {
+    const z = frontZ - j * 1.6 - 0.8;
+    const y = j * 0.6;
+    g.add(box(length, 0.6, 1.6, MAT.light, 0, y + 0.3, z - frontZ));
+    /* individual seats on each step */
+    const n = Math.floor(length / 1.35);
+    for (let i = 0; i < n; i++) {
+      const sx = -length / 2 + 0.9 + i * 1.35;
+      const mat = Math.random() < 0.12 ? MAT.blue : MAT.white;
+      g.add(box(seatW, 0.55, 0.6, mat, sx, y + 0.875, z - frontZ - 0.35));
+    }
+  }
+  /* back wall + side walls */
+  g.add(box(length, rows * 0.6 + 1.6, 0.5, MAT.white, 0, (rows * 0.6 + 1.6) / 2, -rows * 1.6 - 0.5));
+  g.position.set(cx, 0, frontZ);
+  world.add(g);
+}
+grandstand(146, -1, 36, 6);
+
+/* --- spectators in loose clusters + trees ------------------------------ */
 const peopleMat = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, roughness: 0.9 });
 const peopleMat2 = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.9 });
 function person(x, z, s = 1, mat = peopleMat) {
@@ -347,13 +380,35 @@ function person(x, z, s = 1, mat = peopleMat) {
   return g;
 }
 
-for (let side = -1; side <= 1; side += 2) {
-  for (let i = 0; i < 13; i++) {
-    const x = FIELD.x - FIELD.len / 2 + 2 + i * 3.1 + Math.random() * 1.4;
-    const z = FIELD.z + side * (FIELD.wid / 2 + 1.6 + Math.random() * 1.2);
-    person(x, z, 0.9 + Math.random() * 0.25, Math.random() < 0.4 ? peopleMat2 : peopleMat);
+/* a loose huddle of 2-6 people around a point */
+function crowdCluster(cx, cz, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 0.6 + Math.random() * 1.6;
+    person(
+      cx + Math.cos(a) * r,
+      cz + Math.sin(a) * r,
+      0.85 + Math.random() * 0.3,
+      Math.random() < 0.4 ? peopleMat2 : peopleMat
+    );
   }
 }
+
+/* clusters along the south touchline */
+for (let i = 0; i < 5; i++) {
+  crowdCluster(
+    FIELD.x - FIELD.len / 2 + 5 + i * 8.5 + Math.random() * 3,
+    FIELD.z + FIELD.wid / 2 + 2.8 + Math.random() * 1.6,
+    2 + Math.floor(Math.random() * 4)
+  );
+}
+/* a few groups elsewhere along the route */
+crowdCluster(98, 12, 3);
+crowdCluster(112, -2, 2);
+crowdCluster(70, 14, 3);
+crowdCluster(196, 6, 4);
+crowdCluster(214, 2, 2);
+crowdCluster(24, 12, 3);
 
 function tree(x, z, s = 1) {
   const g = new THREE.Group();
@@ -377,19 +432,19 @@ function tree(x, z, s = 1) {
   world.add(g);
 }
 
-for (let i = 0; i < 5; i++) tree(FIELD.x - 24 + i * 11 + Math.random() * 3, FIELD.z - FIELD.wid / 2 - 6 - Math.random() * 3, 0.9 + Math.random() * 0.5);
-for (let i = 0; i < 4; i++) tree(FIELD.x - 16 + i * 11 + Math.random() * 3, FIELD.z + FIELD.wid / 2 + 6 + Math.random() * 3, 0.9 + Math.random() * 0.5);
-tree(88, -4, 1.2);
-tree(104, 16, 1.0);
+for (let i = 0; i < 5; i++) tree(FIELD.x - 22 + i * 11 + Math.random() * 3, FIELD.z + FIELD.wid / 2 + 7 + Math.random() * 3, 0.9 + Math.random() * 0.5);
+tree(FIELD.x - FIELD.len / 2 - 6, FIELD.z + 4, 1.1);
+tree(FIELD.x + FIELD.len / 2 + 12, FIELD.z + 9, 1.0);
+tree(96, -4, 1.2);
+tree(114, 14, 1.0);
+tree(86, 12, 0.9);
 
 /* --- trophy (Pokal) ---------------------------------------------------- */
 function trophy(x, z) {
   const g = new THREE.Group();
-  /* stepped plinth */
   for (let k = 0; k < 3; k++) {
     g.add(box(9 - k * 2.2, 0.9, 9 - k * 2.2, k === 2 ? MAT.white : MAT.light, 0, 0.45 + k * 0.9, 0));
   }
-  /* cup: stem + bowl via lathe */
   const pts = [];
   pts.push(new THREE.Vector2(1.7, 0));
   pts.push(new THREE.Vector2(1.7, 0.3));
@@ -407,7 +462,6 @@ function trophy(x, z) {
   cup.castShadow = true;
   cup.receiveShadow = true;
   g.add(cup);
-  /* handles: symmetric rings half-embedded in the bowl sides */
   for (const sgn of [-1, 1]) {
     const handle = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.3, 10, 28), MAT.white);
     handle.position.set(sgn * 3.6, 9.0, 0);
@@ -438,11 +492,10 @@ function tileField(cx, cz, nx, nz, skip, skipCells = []) {
   world.add(g);
   return g;
 }
-/* member tile sits at grid cell (3, 2) of a 5x5 grid centred at (245, 14)
-   -> world (253.4, 14), which is exactly where the curve ends */
-tileField(245, 14, 5, 5, 0.06, [[3, 2]]);
+/* the member's tile is the CENTRE cell (2,2) of a 5x5 grid */
+tileField(MEMBER.x, MEMBER.z, 5, 5, 0.06, [[2, 2]]);
 
-const memberGlow = (() => {
+const memberRings = (() => {
   /* the member's tile: blue, with a figure standing on it */
   const g = new THREE.Group();
   const tile = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.3, 7.2), MAT.blue);
@@ -450,11 +503,10 @@ const memberGlow = (() => {
   tile.castShadow = true;
   g.add(tile);
   const member = person(0, 0, 1.7, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
-  member.position.set(253.4, 1.3, 14);
-  g.position.set(253.4, 0, 14);
+  member.position.set(MEMBER.x, 1.3, MEMBER.z);
+  g.position.set(MEMBER.x, 0, MEMBER.z);
   world.add(g);
 
-  /* pulsing halo ring that ignites when the beam arrives */
   const ringTex = (() => {
     const c = document.createElement("canvas");
     c.width = c.height = 256;
@@ -473,19 +525,26 @@ const memberGlow = (() => {
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   })();
-  const ring = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({
-      map: ringTex,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.set(253.4, 1.45, 14);
-  scene.add(ring);
-  return ring;
+
+  /* three staggered rings that pulse outward from the tile */
+  const rings = [];
+  for (let k = 0; k < 3; k++) {
+    const ring = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        map: ringTex,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(MEMBER.x, 1.45 + k * 0.02, MEMBER.z);
+    scene.add(ring);
+    rings.push(ring);
+  }
+  return rings;
 })();
 
 /* small filler blocks scattered along the route */
@@ -496,43 +555,35 @@ for (let i = 0; i < 22; i++) {
   const r = 26 + Math.random() * 26;
   const x = p.x + Math.cos(a) * r;
   const z = p.z + Math.sin(a) * r;
-  /* keep the pitch clear */
-  if (Math.abs(x - FIELD.x) < 30 && Math.abs(z - FIELD.z) < 22) continue;
+  if (Math.abs(x - FIELD.x) < 32 && Math.abs(z - FIELD.z) < 24) continue;
+  if (x > 124 && x < 168 && z > -14 && z < 2) continue; /* grandstand */
   const s = 1.5 + Math.random() * 3;
   world.add(box(s, 0.8 + Math.random() * 2.4, s, MAT.light, x, null, z, Math.random()));
-}
-
-/* a few wanderers elsewhere */
-for (let i = 0; i < 14; i++) {
-  const t = Math.random();
-  const p = curve.getPointAt(t);
-  const a = Math.random() * Math.PI * 2;
-  const r = 6 + Math.random() * 14;
-  const x = p.x + Math.cos(a) * r;
-  const z = p.z + Math.sin(a) * r;
-  if (Math.abs(x - FIELD.x) < 24 && Math.abs(z - FIELD.z) < 16) continue;
-  person(x, z, 0.85 + Math.random() * 0.3);
 }
 
 /* ------------------------------------------------------------------ */
 /*  Glowing beams                                                      */
 /* ------------------------------------------------------------------ */
 
-const beamUniforms = {
-  uProgress: { value: 0 },
-  uColor: { value: new THREE.Color(0x55ccff) },
-  uHot: { value: new THREE.Color(0xeaffff) },
-};
-const tribUniforms = {
-  uProgress: { value: 0 },
+const COL = {
+  cyan: new THREE.Color(0x55ccff),
+  cyanHot: new THREE.Color(0xeaffff),
+  coral: new THREE.Color(0xff6a72),
+  coralHot: new THREE.Color(0xffe3e5),
 };
 
-function beamMaterial(intensity, tail, progressUniform = beamUniforms.uProgress) {
+const beamUniforms = { uProgress: { value: 0 } };
+const tribUniforms = { uProgress: { value: 0 } };
+
+/* colA fades into colB along the line (tributaries: coral -> cyan at the
+   junction); the comet head highlight uses `hot`. */
+function beamMaterial(intensity, tail, progressUniform, colA, colB, hot) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uProgress: progressUniform,
-      uColor: beamUniforms.uColor,
-      uHot: beamUniforms.uHot,
+      uColA: { value: colA },
+      uColB: { value: colB },
+      uHot: { value: hot },
       uIntensity: { value: intensity },
       uTail: { value: tail },
     },
@@ -545,7 +596,7 @@ function beamMaterial(intensity, tail, progressUniform = beamUniforms.uProgress)
     `,
     fragmentShader: /* glsl */ `
       uniform float uProgress, uIntensity, uTail;
-      uniform vec3 uColor, uHot;
+      uniform vec3 uColA, uColB, uHot;
       varying vec2 vUv;
       void main() {
         float t = vUv.x;
@@ -554,7 +605,8 @@ function beamMaterial(intensity, tail, progressUniform = beamUniforms.uProgress)
         float head = exp(-rel * 220.0);
         float body = exp(-rel * uTail);
         float a = (head * 1.6 + body * 0.6) * uIntensity;
-        vec3 col = mix(uColor, uHot, clamp(head * 1.4, 0.0, 1.0));
+        vec3 base = mix(uColA, uColB, smoothstep(0.72, 1.0, t));
+        vec3 col = mix(base, uHot, clamp(head * 1.4, 0.0, 1.0));
         gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
       }
     `,
@@ -564,14 +616,18 @@ function beamMaterial(intensity, tail, progressUniform = beamUniforms.uProgress)
   });
 }
 
-/* main beam */
-const coreTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 700, 0.22, 8, false), beamMaterial(1.4, 5.0));
-const glowTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 700, 1.1, 10, false), beamMaterial(0.32, 7.0));
-const hazeTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 500, 2.4, 10, false), beamMaterial(0.06, 9.0));
+const mainBeamMat = (i, tail) =>
+  beamMaterial(i, tail, beamUniforms.uProgress, COL.cyan, COL.cyan, COL.cyanHot);
+const tribBeamMat = (i, tail) =>
+  beamMaterial(i, tail, tribUniforms.uProgress, COL.coral, COL.cyan, COL.coralHot);
+
+const coreTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 700, 0.22, 8, false), mainBeamMat(1.4, 5.0));
+const glowTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 700, 1.1, 10, false), mainBeamMat(0.32, 7.0));
+const hazeTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 500, 2.4, 10, false), mainBeamMat(0.06, 9.0));
 scene.add(coreTube, glowTube, hazeTube);
 
-/* tributaries: one line down from every skyscraper, all merging at the
-   junction. tail = 2 keeps the whole line lit after the pulse passes. */
+/* tributaries: a coral line down from every skyscraper, all merging at
+   the junction where the colour blends into the main beam's cyan. */
 for (const t of towers) {
   const dir = new THREE.Vector3(JUNCTION.x - t.x, 0, JUNCTION.z - t.z).normalize();
   const tCurve = new THREE.CatmullRomCurve3(
@@ -590,8 +646,8 @@ for (const t of towers) {
     "catmullrom",
     0.4
   );
-  scene.add(new THREE.Mesh(new THREE.TubeGeometry(tCurve, 120, 0.16, 8, false), beamMaterial(1.1, 2.0, tribUniforms.uProgress)));
-  scene.add(new THREE.Mesh(new THREE.TubeGeometry(tCurve, 120, 0.7, 8, false), beamMaterial(0.3, 2.5, tribUniforms.uProgress)));
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(tCurve, 120, 0.16, 8, false), tribBeamMat(1.1, 2.0)));
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(tCurve, 120, 0.7, 8, false), tribBeamMat(0.3, 2.5)));
 }
 
 /* comet head sprites */
@@ -641,7 +697,7 @@ const dotData = [];
 {
   const STEP = 1.9;
   const BAND = 17;
-  for (let gx = 8; gx <= 262; gx += STEP) {
+  for (let gx = 8; gx <= 258; gx += STEP) {
     let best = null;
     for (const s of dotSamples) {
       if (Math.abs(s.p.x - gx) > 8) continue;
@@ -745,17 +801,17 @@ scene.add(dots);
 /*  Camera rig driven by scroll                                        */
 /* ------------------------------------------------------------------ */
 
-/* the merge phase: tributaries flow down before the main beam departs */
 const MERGE_END = 0.1;
 
 const camKeys = [
   { p: 0.0, az: 2.5, el: 0.5, dist: 145 }, /* wide on the skyline */
-  { p: 0.1, az: 2.6, el: 0.62, dist: 112 },
-  { p: 0.2, az: 2.7, el: 0.78, dist: 100 }, /* company HQ */
-  { p: 0.38, az: 2.35, el: 0.8, dist: 108 }, /* clubhouse */
-  { p: 0.55, az: 2.5, el: 1.0, dist: 132 }, /* pitch, near top-down */
-  { p: 0.74, az: 2.2, el: 0.6, dist: 92 }, /* trophy, low + close */
-  { p: 0.9, az: 2.3, el: 0.74, dist: 100 },
+  { p: 0.12, az: 2.6, el: 0.65, dist: 112 },
+  { p: 0.29, az: 2.7, el: 0.78, dist: 100 }, /* company HQ */
+  { p: 0.45, az: 2.35, el: 0.8, dist: 105 }, /* clubhouse */
+  { p: 0.58, az: 2.5, el: 1.0, dist: 130 }, /* pitch, near top-down */
+  { p: 0.68, az: 2.35, el: 0.7, dist: 95 }, /* grandstand */
+  { p: 0.82, az: 2.2, el: 0.6, dist: 92 }, /* trophy, low + close */
+  { p: 0.93, az: 2.3, el: 0.76, dist: 100 },
   { p: 1.0, az: 2.1, el: 0.82, dist: 112 }, /* member tile finale */
 ];
 
@@ -789,7 +845,7 @@ ScrollTrigger.create({
 /* ------------------------------------------------------------------ */
 
 const stepEls = Array.from(document.querySelectorAll(".step"));
-const stepThresholds = [0, 0.28, 0.55, 0.8];
+const stepThresholds = [0, 0.29, 0.57, 0.8];
 let activeStep = -1;
 
 function setActiveStep(idx) {
@@ -818,7 +874,7 @@ function tick() {
   progress.current += (progress.target - progress.current) * k;
   const p = progress.current;
 
-  /* phase 1: lines flow down from the towers and merge */
+  /* phase 1: coral lines flow down from the towers and merge */
   tribUniforms.uProgress.value = THREE.MathUtils.clamp(p / (MERGE_END * 0.85), 0, 1);
 
   /* phase 2: the merged beam travels the main route */
@@ -831,7 +887,6 @@ function tick() {
   headBig.position.copy(headPos);
   headMid.position.copy(headPos);
   headCore.position.copy(headPos);
-  /* during the merge the comet charges up at the junction */
   const charge = THREE.MathUtils.clamp(p / MERGE_END, 0.25, 1);
   const pulse = (1 + Math.sin(time * 6) * 0.07) * charge;
   headBig.scale.setScalar(13 * pulse);
@@ -840,11 +895,15 @@ function tick() {
   beamLight.position.set(headPos.x, headPos.y + 3, headPos.z);
   beamLight.intensity = 60 * charge;
 
-  /* member halo ignites at the very end */
+  /* member halo: staggered rings pulsing outward once the beam arrives */
   const arrive = THREE.MathUtils.smoothstep(p, 0.94, 1);
-  const ringPulse = 7 + Math.sin(time * 3.2) * 1.2;
-  memberGlow.scale.setScalar(Math.max(arrive * ringPulse, 0.001));
-  memberGlow.material.opacity = arrive * (0.55 + Math.sin(time * 3.2) * 0.2);
+  for (let i = 0; i < memberRings.length; i++) {
+    const ring = memberRings[i];
+    const phase = ((time * 0.42 + i / memberRings.length) % 1 + 1) % 1;
+    const spread = 5 + phase * 30;
+    ring.scale.setScalar(Math.max(spread * arrive, 0.001));
+    ring.material.opacity = arrive * Math.pow(1 - phase, 1.6) * 0.6;
+  }
 
   const ck = camAt(p);
   camTargetPos.set(
