@@ -37,7 +37,7 @@ body {
 
 /* Tall scroller that drives the animation */
 .scroll-space {
-  height: 950vh;
+  height: 1050vh;
   pointer-events: none;
 }
 
@@ -507,47 +507,8 @@ function signMaterial(text, sub = "", w = 512, h = 128) {
 /*  Ground with subtle texture                                         */
 /* ------------------------------------------------------------------ */
 
-const groundTex = (() => {
-  const c = document.createElement("canvas");
-  c.width = c.height = 512;
-  const ctx = c.getContext("2d");
-  ctx.fillStyle = "#e2eaf4";
-  ctx.fillRect(0, 0, 512, 512);
-  /* soft blotches */
-  for (let i = 0; i < 26; i++) {
-    const r = 30 + Math.random() * 80;
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-    const tint = Math.random() < 0.5 ? "215,226,240" : "230,238,248";
-    g.addColorStop(0, `rgba(${tint},0.5)`);
-    g.addColorStop(1, `rgba(${tint},0)`);
-    ctx.save();
-    ctx.translate(Math.random() * 512, Math.random() * 512);
-    ctx.fillStyle = g;
-    ctx.fillRect(-r, -r, r * 2, r * 2);
-    ctx.restore();
-  }
-  /* fine speckle */
-  for (let i = 0; i < 2400; i++) {
-    ctx.fillStyle = Math.random() < 0.5 ? "rgba(170,185,205,0.10)" : "rgba(255,255,255,0.12)";
-    const s = Math.random() * 1.8 + 0.4;
-    ctx.fillRect(Math.random() * 512, Math.random() * 512, s, s);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(22, 22);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-})();
-
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(1200, 1200),
-  new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1 })
-);
-ground.rotation.x = -Math.PI / 2;
-ground.position.set(130, 0, 0);
-ground.receiveShadow = true;
-scene.add(ground);
+/* the detailed, hand-painted ground is created after the route exists
+   (it paints a walkway underneath the beam's path) */
 
 /* ------------------------------------------------------------------ */
 /*  The route                                                          */
@@ -559,9 +520,9 @@ const CLUB_POS = { x: 108, z: 2 };
 const FIELD = { x: 140, z: 14, len: 42, wid: 27 };
 const APP_POS = { x: 178, z: -5 };
 const TRAIN_POS = { x: 203, z: -17 };
-const TROPHY_POS = { x: 224, z: -12 };
-const BANK_POS = { x: 242, z: -2.5, ry: -Math.atan2(8, 12) };
-const MEMBER = new THREE.Vector3(258, 0.5, 10);
+const TROPHY_POS = { x: 232, z: -14 };
+const BANK_POS = { x: 258, z: -4, ry: -Math.atan2(8, 12) };
+const MEMBER = new THREE.Vector3(288, 0.5, 10);
 
 const curve = new THREE.CatmullRomCurve3(
   [
@@ -591,16 +552,22 @@ const curve = new THREE.CatmullRomCurve3(
     new THREE.Vector3(186, 0.5, -10),
     new THREE.Vector3(196, 0.5, -13),
     new THREE.Vector3(206, 0.5, -14.5), /* past the training corner */
-    new THREE.Vector3(214, 0.5, -14),
-    new THREE.Vector3(219, 0.5, -13),
-    new THREE.Vector3(221.5, 4.5, -12.6),
-    new THREE.Vector3(224, 11.2, -12), /* leaps up into the cup... */
-    new THREE.Vector3(226.5, 4.5, -11.4), /* ...and back out */
-    new THREE.Vector3(230, 0.5, -10.5),
-    new THREE.Vector3(236, 0.5, -6.5),
-    new THREE.Vector3(242, 0.5, -2.5), /* straight through the finance hall */
-    new THREE.Vector3(248, 0.5, 1.5),
-    new THREE.Vector3(253, 0.5, 5.5),
+    new THREE.Vector3(214, 0.5, -14.3),
+    new THREE.Vector3(222, 0.5, -14),
+    new THREE.Vector3(226.8, 0.7, -14), /* rise steeply outside the cup... */
+    new THREE.Vector3(227.6, 6.5, -14),
+    new THREE.Vector3(228.8, 12.9, -14), /* ...hop over the rim... */
+    new THREE.Vector3(232, 9.6, -14), /* ...dip inside the bowl... */
+    new THREE.Vector3(235.2, 12.9, -14), /* ...and hop back out over the rim */
+    new THREE.Vector3(236.4, 6.5, -13.8),
+    new THREE.Vector3(237.2, 0.7, -13.6),
+    new THREE.Vector3(241, 0.5, -12.5),
+    new THREE.Vector3(247, 0.5, -10.3),
+    new THREE.Vector3(252.6, 0.5, -7.6), /* the finance hall's entrance */
+    new THREE.Vector3(258, 0.5, -4), /* straight through the hall */
+    new THREE.Vector3(263.4, 0.5, -0.4),
+    new THREE.Vector3(271, 0.5, 3.4),
+    new THREE.Vector3(280, 0.5, 7),
     MEMBER.clone(), /* the member's tile: centre of the grid */
   ],
   false,
@@ -627,6 +594,111 @@ function nearestT(x, z) {
     }
   }
   return bt;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Ground: one big painted map — a walkway follows the whole route,   */
+/*  green park zones, plaza slabs, speckle. No repeating tiles.        */
+/* ------------------------------------------------------------------ */
+
+{
+  const GR = { x0: -70, z0: -160, size: 470 };
+  const c = document.createElement("canvas");
+  c.width = c.height = 1024;
+  const ctx = c.getContext("2d");
+  const px = (wx) => ((wx - GR.x0) / GR.size) * 1024;
+  const pz = (wz) => (1 - (wz - GR.z0) / GR.size) * 1024; /* plane v flips z */
+  const S = 1024 / GR.size; /* world unit -> pixels */
+
+  ctx.fillStyle = "#e3ebf5";
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  /* large soft tonal blotches */
+  for (let i = 0; i < 34; i++) {
+    const r = 40 + Math.random() * 120;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    const tint = Math.random() < 0.5 ? "210,222,238" : "235,242,250";
+    g.addColorStop(0, `rgba(${tint},0.55)`);
+    g.addColorStop(1, `rgba(${tint},0)`);
+    ctx.save();
+    ctx.translate(Math.random() * 1024, Math.random() * 1024);
+    ctx.fillStyle = g;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+  }
+
+  /* pale green park zones (pitch surroundings, training corner, groves) */
+  const greens = [
+    [FIELD.x, FIELD.z, 42], [FIELD.x - 26, FIELD.z + 16, 18], [FIELD.x + 28, FIELD.z + 12, 16],
+    [TRAIN_POS.x, TRAIN_POS.z, 22], [44, 16, 16], [88, 14, 14], [172, 20, 16], [240, -22, 14],
+  ];
+  for (const [gx, gz, gr] of greens) {
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, gr * S);
+    g.addColorStop(0, "rgba(196,219,198,0.5)");
+    g.addColorStop(1, "rgba(196,219,198,0)");
+    ctx.save();
+    ctx.translate(px(gx), pz(gz));
+    ctx.fillStyle = g;
+    ctx.fillRect(-gr * S, -gr * S, gr * S * 2, gr * S * 2);
+    ctx.restore();
+  }
+
+  /* plaza slabs near HQ, bank and the city block */
+  ctx.fillStyle = "rgba(205,216,231,0.5)";
+  ctx.fillRect(px(HQ_POS.x - 17), pz(HQ_POS.z + 12), 34 * S, 28 * S);
+  ctx.fillRect(px(BANK_POS.x - 13), pz(BANK_POS.z + 10), 26 * S, 21 * S);
+  ctx.fillRect(px(-20), pz(-6), 56 * S, 30 * S);
+
+  /* the walkway that the beam follows: wide soft band + crisp light core */
+  const drawPath = (width, style) => {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = width;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let i = 0; i < routeSamples.length; i += 4) {
+      const s = routeSamples[i].p;
+      if (i === 0) ctx.moveTo(px(s.x), pz(s.z));
+      else ctx.lineTo(px(s.x), pz(s.z));
+    }
+    ctx.stroke();
+  };
+  drawPath(9 * S, "rgba(255,255,255,0.22)");
+  drawPath(4.5 * S, "rgba(255,255,255,0.34)");
+  /* dashed centre line like a marked route */
+  ctx.setLineDash([3 * S, 2.2 * S]);
+  drawPath(0.5 * S, "rgba(160,178,200,0.55)");
+  ctx.setLineDash([]);
+
+  /* fine speckle on top */
+  for (let i = 0; i < 5200; i++) {
+    ctx.fillStyle = Math.random() < 0.5 ? "rgba(168,184,205,0.10)" : "rgba(255,255,255,0.13)";
+    const s = Math.random() * 2 + 0.5;
+    ctx.fillRect(Math.random() * 1024, Math.random() * 1024, s, s);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+
+  const painted = new THREE.Mesh(
+    new THREE.PlaneGeometry(GR.size, GR.size),
+    new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })
+  );
+  painted.rotation.x = -Math.PI / 2;
+  painted.position.set(GR.x0 + GR.size / 2, 0.01, GR.z0 + GR.size / 2);
+  painted.receiveShadow = true;
+  scene.add(painted);
+
+  /* plain backdrop plane beyond the painted area */
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(2400, 2400),
+    new THREE.MeshStandardMaterial({ color: 0xe3ebf5, roughness: 1 })
+  );
+  backdrop.rotation.x = -Math.PI / 2;
+  backdrop.position.set(140, -0.05, 20);
+  backdrop.receiveShadow = true;
+  scene.add(backdrop);
 }
 
 /* keep-clear zones so decoration never blocks the set pieces */
@@ -815,10 +887,14 @@ function clubhouse(x, z) {
   pole.position.set(6.4, 3.25, 4);
   pole.castShadow = true;
   g.add(pole);
-  g.add(box(1.7, 1.0, 0.06, MAT.blue, 7.3, 6, 4));
+  flagMesh = box(1.7, 1.0, 0.06, MAT.blue, 7.3, 6, 4);
+  flagMesh.geometry.translate(0.85, 0, 0); /* pivot at the pole */
+  flagMesh.position.x = 6.45;
+  g.add(flagMesh);
   g.position.set(x, 0, z);
   world.add(g);
 }
+let flagMesh = null;
 clubhouse(CLUB_POS.x, CLUB_POS.z);
 
 /* --- football pitch --------------------------------------------------- */
@@ -1086,7 +1162,6 @@ function house(x, z, ry = 0, s = 1) {
   tree(HQ_POS.x + 16, HQ_POS.z - 5, 1.2);
   bush(HQ_POS.x - 9, HQ_POS.z + 4.5, 1.1);
   bush(HQ_POS.x + 8, HQ_POS.z + 6.2, 0.9);
-  world.add(box(7, 6.5, 6, MAT.light, HQ_POS.x - 18, null, HQ_POS.z + 14, 0.25));
   world.add(box(6, 9, 6, MAT.white, HQ_POS.x + 19, null, HQ_POS.z + 13, -0.2));
 }
 
@@ -1244,66 +1319,116 @@ function trophy(x, z) {
 }
 trophy(TROPHY_POS.x, TROPHY_POS.z);
 
-/* --- finance hall (Beiträge & Finanzen) ---------------------------------- */
+/* --- finance hall (Beiträge & Finanzen): classical bank ------------------ */
 function bank() {
   const { x, z, ry } = BANK_POS;
   const g = new THREE.Group();
-  /* steps + hall */
-  g.add(box(15, 0.5, 11, MAT.grey, 0, 0.25, 0));
-  g.add(box(14, 0.5, 10, MAT.light, 0, 0.65, 0));
-  /* walls must be visible from inside too — the camera rides through */
-  const wallMats = windowMaterial(6, 3, "#f5f8fc", "#cdd9e8").map((m) => {
-    const mm = m === MAT.white ? MAT.white.clone() : m;
-    mm.side = THREE.DoubleSide;
-    return mm;
-  });
-  const hall = new THREE.Mesh(new THREE.BoxGeometry(13, 6.2, 9), wallMats);
-  hall.position.y = 3.55;
+  /* two shallow steps */
+  g.add(box(16.5, 0.3, 12, MAT.grey, 0, 0.15, 0));
+  g.add(box(15.4, 0.3, 11, MAT.light, 0, 0.45, 0));
+  /* hall: solid white walls, visible from inside for the first-person ride */
+  const wallMat = MAT.white.clone();
+  wallMat.side = THREE.DoubleSide;
+  const hall = new THREE.Mesh(new THREE.BoxGeometry(13, 6.2, 9), wallMat);
+  hall.position.y = 3.7;
   hall.castShadow = true;
   hall.receiveShadow = true;
   g.add(hall);
-  /* bright interior floor for the first-person moment */
+  /* interior floor */
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 8.6), MAT.plaza);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0.95;
+  floor.position.y = 0.68;
   g.add(floor);
-  g.add(box(13.8, 0.8, 9.8, MAT.grey, 0, 7.05, 0));
-  /* columns + pediment on the show side */
-  for (let i = 0; i < 5; i++) {
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 5.6, 10), MAT.white);
-    col.position.set(-5 + i * 2.5, 3.3, 4.9);
+  /* pilasters + tall dark windows along both long walls */
+  for (const sgn of [-1, 1]) {
+    for (let i = 0; i < 6; i++) {
+      const lx = -5.4 + i * 2.16;
+      g.add(box(0.5, 5.4, 0.35, MAT.light, lx, 3.6, sgn * 4.62));
+      if (i < 5) {
+        g.add(box(1.15, 3.2, 0.12, MAT.dark, lx + 1.08, 4.1, sgn * 4.56));
+      }
+    }
+  }
+  /* cornice + roof + shallow dome */
+  g.add(box(13.9, 0.6, 9.9, MAT.grey, 0, 7.1, 0));
+  g.add(box(13.1, 0.4, 9.1, MAT.light, 0, 7.55, 0));
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(2.7, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    MAT.white
+  );
+  dome.scale.y = 0.72;
+  dome.position.y = 7.7;
+  dome.castShadow = true;
+  g.add(dome);
+  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.9, 10), MAT.light);
+  lantern.position.y = 9.9;
+  g.add(lantern);
+
+  /* front portico: porch, four columns, architrave and pediment */
+  g.add(box(8, 0.35, 3.0, MAT.light, 0, 0.62, 5.9));
+  for (let i = 0; i < 4; i++) {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 5.2, 12), MAT.white);
+    col.position.set(-3 + i * 2, 3.4, 6.5);
     col.castShadow = true;
     g.add(col);
+    g.add(box(0.85, 0.25, 0.85, MAT.light, -3 + i * 2, 6.1, 6.5));
   }
-  const pediment = new THREE.Mesh(prismGeometry(13.8, 1.8, 1.6), MAT.white);
-  pediment.position.set(0, 7.45, 4.4);
+  const architrave = box(8.4, 0.8, 3.2, MAT.white, 0, 6.6, 5.9);
+  g.add(architrave);
+  const pediment = new THREE.Mesh(prismGeometry(8.4, 1.6, 3.2), MAT.white);
+  pediment.position.set(0, 7.0, 5.9);
   pediment.castShadow = true;
   g.add(pediment);
-  /* sign */
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(8.4, 1.25, 0.16), [
+  /* euro medallion in the pediment */
+  const euroTex = (() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#2b2bd6";
+    ctx.beginPath();
+    ctx.arc(64, 64, 56, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "800 78px Helvetica, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("€", 64, 92);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  })();
+  const euro = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.15, 1.15),
+    new THREE.MeshBasicMaterial({ map: euroTex, transparent: true })
+  );
+  euro.position.set(0, 7.55, 7.52);
+  g.add(euro);
+  /* sign on the architrave, between the columns */
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.78, 0.12), [
     MAT.grey, MAT.grey, MAT.grey, MAT.grey,
-    signMaterial("BEITRÄGE & FINANZEN", "100 % automatisiert"),
+    signMaterial("BEITRÄGE & FINANZEN", "", 512, 64),
     MAT.grey,
   ]);
-  sign.position.set(0, 6.1, 4.99);
+  sign.position.set(0, 6.6, 7.52);
   sign.castShadow = true;
   g.add(sign);
+
   /* glowing rings inside — the first-person ride flies through them */
   for (const lx of [-4.5, -1.5, 1.5, 4.5]) {
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(1.45, 0.09, 10, 28),
       new THREE.MeshBasicMaterial({ color: 0x7fd8ff })
     );
-    ring.position.set(lx, 1.55, 0);
+    ring.position.set(lx, 1.7, 0);
     ring.rotation.y = Math.PI / 2;
     g.add(ring);
   }
-  /* doors on both gable ends */
+
+  /* doors on both gable ends — the beam rides straight through */
   for (const sgn of [-1, 1]) {
-    g.add(box(0.4, 3.4, 4.4, MAT.grey, sgn * 6.4, 1.7, 0));
-    g.add(box(0.3, 3.1, 3.6, MAT.dark, sgn * 6.35, 1.55, 0));
-    const panelA = box(0.16, 3.0, 1.7, MAT.white, sgn * 6.62, 1.5, -0.85);
-    const panelB = box(0.16, 3.0, 1.7, MAT.white, sgn * 6.62, 1.5, 0.85);
+    g.add(box(0.4, 3.4, 4.4, MAT.grey, sgn * 6.4, 1.95, 0));
+    g.add(box(0.3, 3.1, 3.6, MAT.dark, sgn * 6.35, 1.85, 0));
+    const panelA = box(0.16, 3.0, 1.7, MAT.white, sgn * 6.62, 1.8, -0.85);
+    const panelB = box(0.16, 3.0, 1.7, MAT.white, sgn * 6.62, 1.8, 0.85);
     g.add(panelA, panelB);
     registerDoor(
       panelA,
@@ -1604,6 +1729,54 @@ tree(FIELD.x + FIELD.len / 2 + 12, FIELD.z + 9, 1.0);
 /* resolve door trigger points */
 for (const d of doors) d.td = nearestT(d.wx, d.wz);
 
+/* building intervals: the comet's glow hides while it travels indoors.
+   doors were registered in entry/exit pairs per building. */
+const hideIntervals = [];
+for (let i = 0; i + 1 < doors.length; i += 2) {
+  const a = Math.min(doors[i].td, doors[i + 1].td);
+  const b = Math.max(doors[i].td, doors[i + 1].td);
+  hideIntervals.push([a, b]);
+}
+function headVisibility(t) {
+  let v = 1;
+  for (const [a, b] of hideIntervals) {
+    const inside =
+      THREE.MathUtils.smoothstep(t, a - 0.004, a + 0.006) *
+      (1 - THREE.MathUtils.smoothstep(t, b - 0.006, b + 0.004));
+    v *= 1 - inside;
+  }
+  return v;
+}
+
+/* a ring flash at the HQ entrance marks the coral -> cyan hand-over */
+const switchFlash = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const ctx = c.getContext("2d");
+  ctx.strokeStyle = "rgba(150,225,255,0.95)";
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.arc(64, 64, 50, 0, Math.PI * 2);
+  ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+  );
+  m.position.set(HQ_POS.x - 4.7, 1.6, HQ_POS.z);
+  m.rotation.y = Math.PI / 2;
+  scene.add(m);
+  return m;
+})();
+
 /* comet head sprites */
 const glowTexBig = radialTexture([
   [0, "rgba(190,242,255,0.9)"],
@@ -1643,7 +1816,7 @@ const dotData = [];
 {
   const STEP = 1.9;
   const BAND = 17;
-  for (let gx = 8; gx <= 266; gx += STEP) {
+  for (let gx = 8; gx <= 296; gx += STEP) {
     let best = null;
     for (const s of routeSamples) {
       if (Math.abs(s.p.x - gx) > 8) continue;
@@ -1876,13 +2049,22 @@ function tick() {
   headMid.position.copy(headPos);
   headCore.position.copy(headPos);
   const charge = THREE.MathUtils.clamp(p / MERGE_END, 0.25, 1);
-  const headShrink = 1 - povBlend * 0.85; /* don't blind the FP camera */
-  const pulse = (1 + Math.sin(time * 6) * 0.07) * charge * headShrink;
+  /* hide the glow inside buildings; also shrink for the FP camera */
+  const vis = headVisibility(t) * (1 - povBlend * 0.85);
+  const pulse = (1 + Math.sin(time * 6) * 0.07) * charge * Math.max(vis, 0.001);
   headBig.scale.setScalar(13 * pulse);
   headMid.scale.setScalar(5.5 * pulse);
-  headCore.scale.setScalar(2.0 * Math.max(charge, 0.5) * headShrink);
+  headCore.scale.setScalar(2.0 * Math.max(charge, 0.5) * Math.max(vis, 0.001));
   beamLight.position.set(headPos.x, headPos.y + 3, headPos.z);
-  beamLight.intensity = 60 * charge;
+  beamLight.intensity = 60 * charge * (0.35 + 0.65 * vis);
+
+  /* coral -> cyan hand-over flash at the HQ entrance */
+  const flashAmt = Math.exp(-Math.pow((t - T_SWITCH) * 80, 2));
+  switchFlash.material.opacity = flashAmt * 0.85;
+  switchFlash.scale.setScalar(3 + 8 * THREE.MathUtils.clamp((t - T_SWITCH) * 30 + 0.5, 0, 1));
+
+  /* the club flag waves gently */
+  if (flagMesh) flagMesh.rotation.y = Math.sin(time * 2.4) * 0.22 + Math.sin(time * 5.1) * 0.06;
   /* the light matches the line colour: coral before the HQ, cyan after */
   beamLight.color.lerpColors(lightCoral, lightCyan, THREE.MathUtils.smoothstep(t, T_SWITCH - 0.012, T_SWITCH + 0.012));
 

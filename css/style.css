@@ -29,7 +29,7 @@ body {
 
 /* Tall scroller that drives the animation */
 .scroll-space {
-  height: 950vh;
+  height: 1050vh;
   pointer-events: none;
 }
 
