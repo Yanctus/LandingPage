@@ -69,6 +69,8 @@ const MAT = {
   }),
   trunk: new THREE.MeshStandardMaterial({ color: 0xcfc4b8, roughness: 0.95 }),
   leaf: new THREE.MeshStandardMaterial({ color: 0xaccbad, roughness: 0.95, emissive: 0x9dbd9e, emissiveIntensity: 0.15 }),
+  cone: new THREE.MeshStandardMaterial({ color: 0xf2b27d, roughness: 0.85, emissive: 0xd99e6c, emissiveIntensity: 0.15 }),
+  plaza: new THREE.MeshStandardMaterial({ color: 0xd9e2ee, roughness: 1 }),
 };
 
 function box(w, h, d, mat, x = 0, y = null, z = 0, ry = 0) {
@@ -119,38 +121,55 @@ ground.receiveShadow = true;
 scene.add(ground);
 
 /* ------------------------------------------------------------------ */
-/*  The main route: junction -> company HQ -> clubhouse -> pitch ->    */
-/*  grandstand -> trophy -> member tile                                */
+/*  The route. Sweeping arcs: city -> HQ -> clubhouse -> pitch ->      */
+/*  northward arc -> app scene -> training scene -> trophy -> member   */
 /* ------------------------------------------------------------------ */
 
 const JUNCTION = new THREE.Vector3(16, 0.5, 6);
+const HQ_POS = { x: 70, z: 6 };
+const CLUB_POS = { x: 108, z: 2 };
 const FIELD = { x: 140, z: 14, len: 42, wid: 27 };
-const MEMBER = new THREE.Vector3(252, 0.5, 14);
+const APP_POS = { x: 178, z: -5 };
+const TRAIN_POS = { x: 203, z: -17 };
+const TROPHY_POS = { x: 224, z: -12 };
+const MEMBER = new THREE.Vector3(256, 0.5, 8);
 
 const curve = new THREE.CatmullRomCurve3(
   [
     JUNCTION.clone(),
-    new THREE.Vector3(28, 0.5, 9),
-    new THREE.Vector3(42, 0.5, 5),
-    new THREE.Vector3(56, 0.5, 6),
-    new THREE.Vector3(66, 0.5, 6), /* straight through the HQ entrance */
-    new THREE.Vector3(76, 0.5, 7),
-    new THREE.Vector3(90, 0.5, 3),
-    new THREE.Vector3(104, 0.5, 4), /* through the clubhouse */
-    new THREE.Vector3(116, 0.5, 9),
-    new THREE.Vector3(128, 0.5, 13),
+    new THREE.Vector3(24, 0.5, 14),
+    new THREE.Vector3(34, 0.5, 21), /* big southern arc away from the city */
+    new THREE.Vector3(46, 0.5, 23),
+    new THREE.Vector3(56, 0.5, 18),
+    new THREE.Vector3(62, 0.5, 10),
+    new THREE.Vector3(66, 0.5, 6.4),
+    new THREE.Vector3(70, 0.5, 6), /* through the HQ entrance */
+    new THREE.Vector3(75, 0.5, 5.8),
+    new THREE.Vector3(85, 0.5, 0),
+    new THREE.Vector3(94, 0.5, -2),
+    new THREE.Vector3(101, 0.5, 1),
+    new THREE.Vector3(105.5, 0.5, 2),
+    new THREE.Vector3(110, 0.5, 2), /* through the clubhouse */
+    new THREE.Vector3(115, 0.5, 2.6),
+    new THREE.Vector3(123, 0.5, 7),
+    new THREE.Vector3(131, 0.5, 12),
     new THREE.Vector3(140, 0.5, 14), /* across the pitch centre */
     new THREE.Vector3(152, 0.5, 14),
     new THREE.Vector3(160.6, 0.5, 14), /* right through the east goal */
-    new THREE.Vector3(172, 0.5, 11),
-    new THREE.Vector3(186, 0.5, 8),
-    new THREE.Vector3(197, 0.5, 7),
-    new THREE.Vector3(202, 4.5, 7.5),
-    new THREE.Vector3(205, 11.2, 8), /* leaps up into the cup... */
-    new THREE.Vector3(208, 4.5, 9), /* ...and back out */
-    new THREE.Vector3(213, 0.5, 9.5),
-    new THREE.Vector3(226, 0.5, 10),
-    new THREE.Vector3(239, 0.5, 11),
+    new THREE.Vector3(169, 0.5, 11),
+    new THREE.Vector3(175, 0.5, 3), /* the northward arc begins */
+    new THREE.Vector3(178, 0.5, -4), /* past the two app users */
+    new THREE.Vector3(186, 0.5, -10),
+    new THREE.Vector3(196, 0.5, -13),
+    new THREE.Vector3(206, 0.5, -14.5), /* past the training corner */
+    new THREE.Vector3(214, 0.5, -14),
+    new THREE.Vector3(219, 0.5, -13),
+    new THREE.Vector3(221.5, 4.5, -12.6),
+    new THREE.Vector3(224, 11.2, -12), /* leaps up into the cup... */
+    new THREE.Vector3(226.5, 4.5, -11.4), /* ...and back out */
+    new THREE.Vector3(230, 0.5, -10.5),
+    new THREE.Vector3(238, 0.5, -6),
+    new THREE.Vector3(246, 0.5, 1),
     MEMBER.clone(), /* the member's tile: centre of the grid */
   ],
   false,
@@ -158,12 +177,63 @@ const curve = new THREE.CatmullRomCurve3(
   0.5
 );
 
+/* keep-clear zones so decoration never blocks the route's set pieces */
+const CLEAR = [
+  { x: HQ_POS.x, z: HQ_POS.z, r: 17 },
+  { x: CLUB_POS.x, z: CLUB_POS.z, r: 12 },
+  { x: APP_POS.x, z: APP_POS.z, r: 9 },
+  { x: TRAIN_POS.x, z: TRAIN_POS.z, r: 13 },
+  { x: TROPHY_POS.x, z: TROPHY_POS.z, r: 11 },
+  { x: MEMBER.x, z: MEMBER.z, r: 24 },
+];
+function isClear(x, z) {
+  if (Math.abs(x - FIELD.x) < 34 && Math.abs(z - FIELD.z) < 26) return false;
+  if (x > 114 && x < 166 && z > -14 && z < 2) return false; /* grandstand */
+  for (const c of CLEAR) {
+    if (Math.hypot(x - c.x, z - c.z) < c.r) return false;
+  }
+  /* keep a corridor free around the beam */
+  let minD = Infinity;
+  for (const s of routeSamples) {
+    const d = Math.hypot(s.p.x - x, s.p.z - z);
+    if (d < minD) minD = d;
+  }
+  return minD > 7;
+}
+
+const routeSamples = [];
+{
+  const N = 900;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    routeSamples.push({ t, p: curve.getPointAt(t) });
+  }
+}
+function nearestT(x, z) {
+  let bt = 0;
+  let bd = Infinity;
+  for (const s of routeSamples) {
+    const d = (s.p.x - x) ** 2 + (s.p.z - z) ** 2;
+    if (d < bd) {
+      bd = d;
+      bt = s.t;
+    }
+  }
+  return bt;
+}
+
 /* ------------------------------------------------------------------ */
 /*  World construction                                                 */
 /* ------------------------------------------------------------------ */
 
 const world = new THREE.Group();
 scene.add(world);
+
+/* sliding doors that open as the beam approaches and close behind it */
+const doors = [];
+function registerDoor(panelA, panelB, slide, wx, wz) {
+  doors.push({ panelA, panelB, slide, wx, wz, td: 0, baseA: panelA.position.clone(), baseB: panelB.position.clone() });
+}
 
 /* --- skyscraper district (start) ----------------------------------- */
 function skyscraper(x, z, w, h, d, ry = 0) {
@@ -189,7 +259,6 @@ const towers = [
   skyscraper(31, -15, 5, 13, 5, 0.08),
 ];
 
-/* low city blocks filling the district */
 for (let i = 0; i < 14; i++) {
   const x = -18 + Math.random() * 52;
   const z = -32 + Math.random() * 22;
@@ -197,24 +266,26 @@ for (let i = 0; i < 14; i++) {
   world.add(box(2.5 + Math.random() * 3.5, 1.5 + Math.random() * 4, 2.5 + Math.random() * 3.5, MAT.light, x, null, z, Math.random() * 0.4));
 }
 
-/* --- company HQ with logo and a real entrance ----------------------- */
+/* --- company HQ with logo, plaza and sliding doors ------------------- */
 function buildHQ() {
   const g = new THREE.Group();
   g.add(box(9, 11, 9, MAT.white, 0, null, 0));
-  /* annexes kept clear of the beam, which passes through along x */
   g.add(box(6, 7.5, 6, MAT.light, -5.5, null, -7.5));
   g.add(box(5, 5, 6, MAT.light, 5.8, null, -7));
   g.add(box(9.6, 0.7, 9.6, MAT.grey, 0, 11.1, 0));
 
-  /* window strips above the ground floor */
   for (let i = 0; i < 4; i++) {
     g.add(box(9.12, 0.35, 9.12, MAT.dark, 0, 3.6 + i * 2.0, 0));
   }
 
-  /* entrance + exit portals at ground level: the beam runs through them */
+  /* entrance + exit portals; white panels slide open for the beam */
   for (const sgn of [-1, 1]) {
     g.add(box(0.5, 3.2, 4.6, MAT.grey, sgn * 4.45, 1.6, 0)); /* portal frame */
-    g.add(box(0.4, 2.7, 3.4, MAT.dark, sgn * 4.75, 1.35, 0)); /* dark doorway */
+    g.add(box(0.3, 2.7, 3.6, MAT.dark, sgn * 4.4, 1.35, 0)); /* dark opening */
+    const panelA = box(0.18, 2.6, 1.7, MAT.white, sgn * 4.68, 1.3, -0.85);
+    const panelB = box(0.18, 2.6, 1.7, MAT.white, sgn * 4.68, 1.3, 0.85);
+    g.add(panelA, panelB);
+    registerDoor(panelA, panelB, 1.78, HQ_POS.x + sgn * 4.6, HQ_POS.z);
   }
 
   /* logo panel (placeholder mark — swap the canvas drawing for the real logo) */
@@ -247,12 +318,21 @@ function buildHQ() {
   emblem.position.set(2.2, 7.4, 4.56);
   g.add(emblem);
 
-  g.position.set(66, 0, 6);
+  g.position.set(HQ_POS.x, 0, HQ_POS.z);
   return g;
 }
 world.add(buildHQ());
 
-/* --- clubhouse (Vereinsheim), beam passes through it ------------------ */
+/* plaza under the HQ */
+{
+  const plaza = new THREE.Mesh(new THREE.PlaneGeometry(30, 24), MAT.plaza);
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.set(HQ_POS.x, 0.03, HQ_POS.z - 2);
+  plaza.receiveShadow = true;
+  world.add(plaza);
+}
+
+/* --- clubhouse (Vereinsheim) with sliding doors ----------------------- */
 function clubhouse(x, z) {
   const g = new THREE.Group();
   g.add(box(10, 3.4, 6.5, MAT.white));
@@ -262,16 +342,19 @@ function clubhouse(x, z) {
   roof.castShadow = true;
   roof.receiveShadow = true;
   g.add(roof);
-  /* terrace + front door + windows on the pitch side */
   g.add(box(10.6, 0.3, 2.4, MAT.grey, 0, 0.15, 4.3));
   g.add(box(1.4, 2.2, 0.15, MAT.dark, -2.2, 1.1, 3.3));
   g.add(box(1.6, 0.9, 0.12, MAT.dark, 1.6, 1.9, 3.3));
   g.add(box(1.6, 0.9, 0.12, MAT.dark, 3.6, 1.9, 3.3));
-  /* pass-through doorways for the beam (west + east gable walls) */
+  /* beam doorways in the gable walls, with sliding panels */
   for (const sgn of [-1, 1]) {
-    g.add(box(0.3, 2.4, 2.0, MAT.dark, sgn * 5.05, 1.2, 0));
+    g.add(box(0.3, 2.5, 2.6, MAT.grey, sgn * 4.95, 1.25, 0));
+    g.add(box(0.25, 2.4, 2.0, MAT.dark, sgn * 4.9, 1.2, 0));
+    const panelA = box(0.16, 2.3, 1.0, MAT.white, sgn * 5.15, 1.15, -0.5);
+    const panelB = box(0.16, 2.3, 1.0, MAT.white, sgn * 5.15, 1.15, 0.5);
+    g.add(panelA, panelB);
+    registerDoor(panelA, panelB, 1.05, x + sgn * 5, z);
   }
-  /* flag pole */
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 6.5, 8), MAT.grey);
   pole.position.set(6.4, 3.25, 4);
   pole.castShadow = true;
@@ -280,7 +363,7 @@ function clubhouse(x, z) {
   g.position.set(x, 0, z);
   world.add(g);
 }
-clubhouse(104, 4);
+clubhouse(CLUB_POS.x, CLUB_POS.z);
 
 /* --- football pitch --------------------------------------------------- */
 function pitchTexture() {
@@ -342,11 +425,37 @@ function pitchTexture() {
   }
 }
 
-/* --- spectators in loose clusters + trees ------------------------------ */
+/* --- people ------------------------------------------------------------ */
 const peopleMat = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, roughness: 0.9 });
 const peopleMat2 = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.9 });
+function person(x, z, s = 1, mat = peopleMat) {
+  const g = new THREE.Group();
+  const bodyM = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * s, 0.5 * s, 4, 8), mat);
+  bodyM.position.y = 0.45 * s;
+  bodyM.castShadow = true;
+  g.add(bodyM);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 10, 8), mat);
+  head.position.y = 0.95 * s;
+  g.add(head);
+  g.position.set(x, 0, z);
+  world.add(g);
+  return g;
+}
 
-/* --- grandstand, aligned flush with the pitch's north touchline -------- */
+function crowdCluster(cx, cz, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 0.6 + Math.random() * 1.6;
+    person(
+      cx + Math.cos(a) * r,
+      cz + Math.sin(a) * r,
+      0.85 + Math.random() * 0.3,
+      Math.random() < 0.4 ? peopleMat2 : peopleMat
+    );
+  }
+}
+
+/* --- grandstand, flush with the pitch's north touchline ---------------- */
 function grandstand(cx, frontZ, length, rows) {
   const g = new THREE.Group();
   const seatW = 0.72;
@@ -354,13 +463,11 @@ function grandstand(cx, frontZ, length, rows) {
     const z = frontZ - j * 1.6 - 0.8;
     const y = j * 0.6;
     g.add(box(length, 0.6, 1.6, MAT.light, 0, y + 0.3, z - frontZ));
-    /* individual seats on each step */
     const n = Math.floor(length / 1.35);
     for (let i = 0; i < n; i++) {
       const sx = -length / 2 + 0.9 + i * 1.35;
       const mat = Math.random() < 0.12 ? MAT.blue : MAT.white;
       g.add(box(seatW, 0.55, 0.6, mat, sx, y + 0.875, z - frontZ - 0.35));
-      /* a seated supporter on some of the seats */
       if (Math.random() < 0.38) {
         const pm = Math.random() < 0.4 ? peopleMat2 : peopleMat;
         const fan = new THREE.Group();
@@ -376,40 +483,11 @@ function grandstand(cx, frontZ, length, rows) {
       }
     }
   }
-  /* back wall */
   g.add(box(length, rows * 0.6 + 1.6, 0.5, MAT.white, 0, (rows * 0.6 + 1.6) / 2, -rows * 1.6 - 0.5));
   g.position.set(cx, 0, frontZ);
   world.add(g);
 }
-/* same centre + length as the pitch, sitting right on the touchline */
 grandstand(FIELD.x, FIELD.z - FIELD.wid / 2 - 1.2, FIELD.len, 6);
-function person(x, z, s = 1, mat = peopleMat) {
-  const g = new THREE.Group();
-  const bodyM = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * s, 0.5 * s, 4, 8), mat);
-  bodyM.position.y = 0.45 * s;
-  bodyM.castShadow = true;
-  g.add(bodyM);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 10, 8), mat);
-  head.position.y = 0.95 * s;
-  g.add(head);
-  g.position.set(x, 0, z);
-  world.add(g);
-  return g;
-}
-
-/* a loose huddle of 2-6 people around a point */
-function crowdCluster(cx, cz, n) {
-  for (let i = 0; i < n; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const r = 0.6 + Math.random() * 1.6;
-    person(
-      cx + Math.cos(a) * r,
-      cz + Math.sin(a) * r,
-      0.85 + Math.random() * 0.3,
-      Math.random() < 0.4 ? peopleMat2 : peopleMat
-    );
-  }
-}
 
 /* clusters along the south touchline */
 for (let i = 0; i < 5; i++) {
@@ -419,14 +497,14 @@ for (let i = 0; i < 5; i++) {
     2 + Math.floor(Math.random() * 4)
   );
 }
-/* a few groups elsewhere along the route */
-crowdCluster(98, 12, 3);
-crowdCluster(112, -2, 2);
-crowdCluster(70, 14, 3);
-crowdCluster(196, 6, 4);
-crowdCluster(214, 2, 2);
+crowdCluster(100, 10, 3);
+crowdCluster(118, -4, 2);
+crowdCluster(76, 16, 3);
 crowdCluster(24, 12, 3);
+crowdCluster(212, -22, 2);
+crowdCluster(232, -2, 3);
 
+/* --- trees, hedges, bushes ---------------------------------------------- */
 function tree(x, z, s = 1) {
   const g = new THREE.Group();
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.24 * s, 1.6 * s, 8), MAT.trunk);
@@ -449,12 +527,269 @@ function tree(x, z, s = 1) {
   world.add(g);
 }
 
+function bush(x, z, s = 1) {
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.7 * s, 10, 8), MAT.leaf);
+  leaf.position.set(x, 0.5 * s, z);
+  leaf.scale.y = 0.75;
+  leaf.castShadow = true;
+  world.add(leaf);
+}
+
+function hedge(x, z, n, ry = 0) {
+  const g = new THREE.Group();
+  for (let i = 0; i < n; i++) {
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), MAT.leaf);
+    leaf.position.set(i * 0.85, 0.45, 0);
+    leaf.scale.y = 0.8;
+    leaf.castShadow = true;
+    g.add(leaf);
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = ry;
+  world.add(g);
+}
+
+/* --- street furniture ---------------------------------------------------- */
+function lamp(x, z) {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.2, 8), MAT.grey);
+  pole.position.y = 1.6;
+  pole.castShadow = true;
+  g.add(pole);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0xfff7dd, emissive: 0xfff3c8, emissiveIntensity: 0.9, roughness: 0.4 })
+  );
+  head.position.y = 3.3;
+  g.add(head);
+  g.position.set(x, 0, z);
+  world.add(g);
+}
+
+function bench(x, z, ry = 0) {
+  const g = new THREE.Group();
+  g.add(box(1.7, 0.1, 0.45, MAT.trunk, 0, 0.45, 0));
+  g.add(box(1.7, 0.45, 0.08, MAT.trunk, 0, 0.7, -0.22));
+  g.add(box(0.1, 0.45, 0.4, MAT.grey, -0.7, 0.22, 0));
+  g.add(box(0.1, 0.45, 0.4, MAT.grey, 0.7, 0.22, 0));
+  g.position.set(x, 0, z);
+  g.rotation.y = ry;
+  world.add(g);
+}
+
+function car(x, z, ry = 0) {
+  const g = new THREE.Group();
+  const bodyMat = Math.random() < 0.4 ? MAT.white : Math.random() < 0.5 ? MAT.grey : MAT.dark;
+  g.add(box(2.1, 0.55, 1.0, bodyMat, 0, 0.5, 0));
+  g.add(box(1.15, 0.42, 0.92, MAT.light, -0.1, 0.98, 0));
+  for (const [wx, wz] of [[-0.7, 0.5], [-0.7, -0.5], [0.7, 0.5], [0.7, -0.5]]) {
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.18, 10), MAT.dark);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(wx, 0.2, wz);
+    g.add(wheel);
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = ry;
+  world.add(g);
+}
+
+/* small residential house */
+function house(x, z, ry = 0, s = 1) {
+  const g = new THREE.Group();
+  g.add(box(4.2 * s, 2.6 * s, 5.2 * s, MAT.white));
+  const roof = new THREE.Mesh(prismGeometry(4.5 * s, 1.7 * s, 5.6 * s), MAT.light);
+  roof.position.y = 2.6 * s;
+  roof.castShadow = true;
+  roof.receiveShadow = true;
+  g.add(roof);
+  g.add(box(0.9 * s, 1.6 * s, 0.1, MAT.dark, 0.8 * s, 0.8 * s, 2.62 * s));
+  g.add(box(1.1 * s, 0.8 * s, 0.1, MAT.dark, -1.1 * s, 1.5 * s, 2.62 * s));
+  g.position.set(x, 0, z);
+  g.rotation.y = ry;
+  world.add(g);
+}
+
+/* --- decorate the HQ surroundings (no more empty plaza) ----------------- */
+{
+  /* parking lot with cars */
+  const lot = new THREE.Mesh(new THREE.PlaneGeometry(13, 8), new THREE.MeshStandardMaterial({ color: 0xcdd8e6, roughness: 1 }));
+  lot.rotation.x = -Math.PI / 2;
+  lot.position.set(HQ_POS.x - 1, 0.05, HQ_POS.z + 12.5);
+  lot.receiveShadow = true;
+  world.add(lot);
+  car(HQ_POS.x - 5, HQ_POS.z + 11.5, 0.04);
+  car(HQ_POS.x - 2, HQ_POS.z + 11.5, -0.06);
+  car(HQ_POS.x + 1, HQ_POS.z + 11.5, 0.02);
+  car(HQ_POS.x + 4, HQ_POS.z + 13.8, 0.6);
+
+  hedge(HQ_POS.x - 13, HQ_POS.z + 6, 7, 1.2);
+  hedge(HQ_POS.x + 9, HQ_POS.z + 9, 6, 0.2);
+  bench(HQ_POS.x - 8, HQ_POS.z + 7.5, 0.4);
+  bench(HQ_POS.x + 10, HQ_POS.z + 3, -1.1);
+  lamp(HQ_POS.x - 11, HQ_POS.z + 9);
+  lamp(HQ_POS.x + 12, HQ_POS.z + 7);
+  tree(HQ_POS.x - 15, HQ_POS.z - 3, 1.1);
+  tree(HQ_POS.x + 14, HQ_POS.z + 11, 0.9);
+  tree(HQ_POS.x + 16, HQ_POS.z - 5, 1.2);
+  bush(HQ_POS.x - 9, HQ_POS.z + 4.5, 1.1);
+  bush(HQ_POS.x + 8, HQ_POS.z + 6.2, 0.9);
+  /* two neighbouring office blocks */
+  world.add(box(7, 6.5, 6, MAT.light, HQ_POS.x - 18, null, HQ_POS.z + 14, 0.25));
+  world.add(box(6, 9, 6, MAT.white, HQ_POS.x + 19, null, HQ_POS.z + 13, -0.2));
+}
+
+/* residential pockets along the route */
+house(48, 6, 0.4);
+house(54, 0, 0.2, 0.9);
+house(88, 10, -0.3);
+house(95, 14, 0.1, 1.1);
+house(122, -8, 0.5, 0.9);
+house(170, 18, -0.2);
+house(177, 23, 0.3, 0.9);
+house(238, -22, 0.15);
+house(208, 4, -0.4, 0.9);
+
+/* trees + greenery along the whole route */
+for (let i = 0; i < 26; i++) {
+  const t = Math.random();
+  const p = curve.getPointAt(t);
+  const a = Math.random() * Math.PI * 2;
+  const r = 10 + Math.random() * 22;
+  const x = p.x + Math.cos(a) * r;
+  const z = p.z + Math.sin(a) * r;
+  if (!isClear(x, z)) continue;
+  if (Math.random() < 0.55) tree(x, z, 0.8 + Math.random() * 0.6);
+  else bush(x, z, 0.8 + Math.random() * 0.6);
+}
+
+/* lamps along the beam's path */
+for (let i = 1; i <= 9; i++) {
+  const t = i / 10;
+  const p = curve.getPointAt(t);
+  const tangent = curve.getTangentAt(t);
+  const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
+  const sgn = i % 2 ? 1 : -1;
+  const x = p.x + side.x * 6.5 * sgn;
+  const z = p.z + side.z * 6.5 * sgn;
+  if (Math.abs(x - FIELD.x) < 34 && Math.abs(z - FIELD.z) < 26) continue;
+  lamp(x, z);
+}
+
+/* trees around the pitch */
 for (let i = 0; i < 5; i++) tree(FIELD.x - 22 + i * 11 + Math.random() * 3, FIELD.z + FIELD.wid / 2 + 7 + Math.random() * 3, 0.9 + Math.random() * 0.5);
 tree(FIELD.x - FIELD.len / 2 - 6, FIELD.z + 4, 1.1);
 tree(FIELD.x + FIELD.len / 2 + 12, FIELD.z + 9, 1.0);
-tree(96, -4, 1.2);
-tree(114, 14, 1.0);
-tree(86, 12, 0.9);
+
+/* --- scene: two supporters with glowing phones (the app moment) -------- */
+const phoneScreens = [];
+function phonePerson(x, z, faceA, s = 1.3) {
+  const g = person(x, z, s);
+  g.rotation.y = faceA;
+  const phone = new THREE.Group();
+  const bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.34 * s, 0.6 * s, 0.05 * s), MAT.dark);
+  phone.add(bodyM);
+  const screen = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.28 * s, 0.52 * s),
+    new THREE.MeshStandardMaterial({ color: 0xbfe8ff, emissive: 0x66ccff, emissiveIntensity: 1.4, roughness: 0.3 })
+  );
+  screen.position.z = 0.03 * s;
+  phone.add(screen);
+  phone.position.set(0, 0.78 * s, 0.34 * s);
+  phone.rotation.x = -0.5;
+  g.add(phone);
+  phoneScreens.push(screen);
+  return g;
+}
+phonePerson(APP_POS.x - 1.2, APP_POS.z - 1.6, 0.5);
+phonePerson(APP_POS.x + 1.3, APP_POS.z - 2.2, -2.4, 1.2);
+bush(APP_POS.x - 4, APP_POS.z - 4, 0.8);
+lamp(APP_POS.x + 4.5, APP_POS.z - 4);
+
+/* --- scene: 100+ training sessions -------------------------------------- */
+{
+  /* tactics board */
+  const boardTex = (() => {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 320;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 512, 320);
+    ctx.strokeStyle = "#c3cedd";
+    ctx.lineWidth = 10;
+    ctx.strokeRect(5, 5, 502, 310);
+    ctx.fillStyle = "#11151c";
+    ctx.font = "800 92px Helvetica, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("100+", 256, 128);
+    ctx.font = "700 30px Helvetica, Arial, sans-serif";
+    ctx.fillStyle = "#5c6675";
+    ctx.fillText("TRAININGSEINHEITEN", 256, 178);
+    /* little tactic scribbles */
+    ctx.strokeStyle = "#2b2bd6";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(120, 245, 18, 0, Math.PI * 2);
+    ctx.moveTo(150, 245);
+    ctx.lineTo(240, 245);
+    ctx.lineTo(225, 232);
+    ctx.moveTo(240, 245);
+    ctx.lineTo(225, 258);
+    ctx.stroke();
+    ctx.strokeStyle = "#ff6a72";
+    ctx.beginPath();
+    ctx.moveTo(300, 230);
+    ctx.lineTo(330, 260);
+    ctx.moveTo(330, 230);
+    ctx.lineTo(300, 260);
+    ctx.moveTo(370, 230);
+    ctx.lineTo(400, 260);
+    ctx.moveTo(400, 230);
+    ctx.lineTo(370, 260);
+    ctx.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  })();
+  const board = new THREE.Group();
+  const panel = new THREE.Mesh(
+    new THREE.BoxGeometry(6.4, 4.0, 0.18),
+    [MAT.grey, MAT.grey, MAT.grey, MAT.grey, new THREE.MeshStandardMaterial({ map: boardTex, roughness: 0.7 }), MAT.grey]
+  );
+  panel.position.y = 3.1;
+  panel.castShadow = true;
+  board.add(panel);
+  for (const sgn of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 2.4, 8), MAT.grey);
+    leg.position.set(sgn * 2.6, 1.2, 0);
+    leg.castShadow = true;
+    board.add(leg);
+  }
+  board.position.set(TRAIN_POS.x, 0, TRAIN_POS.z - 3.5);
+  board.rotation.y = 0.15;
+  world.add(board);
+
+  /* training cones in two rows + balls */
+  const coneGeo = new THREE.ConeGeometry(0.34, 0.7, 10);
+  for (let i = 0; i < 5; i++) {
+    for (const dz of [0, 2.2]) {
+      const cone = new THREE.Mesh(coneGeo, MAT.cone);
+      cone.position.set(TRAIN_POS.x - 5 + i * 2.4 + (dz ? 1.2 : 0), 0.35, TRAIN_POS.z + 1.5 + dz);
+      cone.castShadow = true;
+      world.add(cone);
+    }
+  }
+  const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45 });
+  for (const [bx, bz] of [[-6.5, 3.2], [4.8, 0.6], [6.2, 3.6]]) {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 12), ballMat);
+    ball.position.set(TRAIN_POS.x + bx, 0.38, TRAIN_POS.z + bz);
+    ball.castShadow = true;
+    world.add(ball);
+  }
+  /* a coach figure pointing at the board */
+  person(TRAIN_POS.x - 2.8, TRAIN_POS.z - 1.6, 1.15, peopleMat2);
+  person(TRAIN_POS.x + 2.4, TRAIN_POS.z - 0.8, 1.0);
+}
 
 /* --- trophy (Pokal) ---------------------------------------------------- */
 function trophy(x, z) {
@@ -488,19 +823,16 @@ function trophy(x, z) {
   g.position.set(x, 0, z);
   world.add(g);
 }
-trophy(205, 8);
+trophy(TROPHY_POS.x, TROPHY_POS.z);
 
 /* --- member tile field (finale) ---------------------------------------- */
-/* a complete 5x5 square; the member's tile is the exact centre cell.
-   every surrounding tile gets its own material so the outward pulse can
-   lift it and flash it as the wave passes through. */
 const tileGeo = new THREE.BoxGeometry(7.2, 1.0, 7.2);
 const finaleTiles = [];
 {
   const N = 5;
   for (let i = 0; i < N; i++) {
     for (let j = 0; j < N; j++) {
-      if (i === 2 && j === 2) continue; /* centre = the member's tile */
+      if (i === 2 && j === 2) continue;
       const mat = MAT.light.clone();
       const t = new THREE.Mesh(tileGeo, mat);
       const x = MEMBER.x + (i - (N - 1) / 2) * 8.4;
@@ -509,11 +841,7 @@ const finaleTiles = [];
       t.castShadow = true;
       t.receiveShadow = true;
       world.add(t);
-      finaleTiles.push({
-        mesh: t,
-        mat,
-        dist: Math.hypot(x - MEMBER.x, z - MEMBER.z),
-      });
+      finaleTiles.push({ mesh: t, mat, dist: Math.hypot(x - MEMBER.x, z - MEMBER.z) });
     }
   }
 }
@@ -522,14 +850,53 @@ const tileEmissiveFlash = new THREE.Color(0x9fd8ff);
 const tileEmissiveTmp = new THREE.Color();
 
 const memberRings = (() => {
-  /* the member's tile: blue, with a figure standing on it */
   const g = new THREE.Group();
   const tile = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.3, 7.2), MAT.blue);
   tile.position.y = 0.65;
   tile.castShadow = true;
   g.add(tile);
-  const member = person(0, 0, 1.7, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
+
+  /* the member: jersey colour shifts when the beam arrives */
+  const memberBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+  const memberHeadMat = new THREE.MeshStandardMaterial({ color: 0xf0e6da, roughness: 0.7 });
+  const member = new THREE.Group();
+  const s = 1.7;
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * s, 0.5 * s, 4, 8), memberBodyMat);
+  torso.position.y = 0.45 * s;
+  torso.castShadow = true;
+  member.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 10, 8), memberHeadMat);
+  head.position.y = 0.95 * s;
+  member.add(head);
   member.position.set(MEMBER.x, 1.3, MEMBER.z);
+  world.add(member);
+
+  /* football at the member's feet */
+  const ballTex = (() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = "#1a2030";
+    for (const [px, py] of [[20, 28], [70, 14], [112, 40], [42, 72], [96, 88], [16, 104], [64, 116]]) {
+      ctx.beginPath();
+      ctx.arc(px, py, 12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  })();
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(0.42, 16, 14),
+    new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45 })
+  );
+  ball.position.set(MEMBER.x + 0.95, 1.3 + 0.42, MEMBER.z + 0.55);
+  ball.castShadow = true;
+  ball.scale.setScalar(0.001);
+  world.add(ball);
+
   g.position.set(MEMBER.x, 0, MEMBER.z);
   world.add(g);
 
@@ -552,7 +919,6 @@ const memberRings = (() => {
     return tex;
   })();
 
-  /* three staggered rings that pulse outward from the tile */
   const rings = [];
   for (let k = 0; k < 3; k++) {
     const ring = new THREE.Mesh(
@@ -571,6 +937,8 @@ const memberRings = (() => {
     rings.push(ring);
   }
   rings.figure = member;
+  rings.bodyMat = memberBodyMat;
+  rings.ball = ball;
   return rings;
 })();
 
@@ -607,18 +975,20 @@ const confP = new THREE.Vector3();
 const confS = new THREE.Vector3();
 
 /* small filler blocks scattered along the route */
-for (let i = 0; i < 22; i++) {
+for (let i = 0; i < 18; i++) {
   const t = Math.random();
   const p = curve.getPointAt(t);
   const a = Math.random() * Math.PI * 2;
   const r = 26 + Math.random() * 26;
   const x = p.x + Math.cos(a) * r;
   const z = p.z + Math.sin(a) * r;
-  if (Math.abs(x - FIELD.x) < 32 && Math.abs(z - FIELD.z) < 24) continue;
-  if (x > 114 && x < 166 && z > -14 && z < 2) continue; /* grandstand */
+  if (!isClear(x, z)) continue;
   const s = 1.5 + Math.random() * 3;
   world.add(box(s, 0.8 + Math.random() * 2.4, s, MAT.light, x, null, z, Math.random()));
 }
+
+/* resolve door trigger points now that the route is sampled */
+for (const d of doors) d.td = nearestT(d.wx, d.wz);
 
 /* ------------------------------------------------------------------ */
 /*  Glowing beams                                                      */
@@ -634,8 +1004,6 @@ const COL = {
 const beamUniforms = { uProgress: { value: 0 } };
 const tribUniforms = { uProgress: { value: 0 } };
 
-/* colA fades into colB along the line (tributaries: coral -> cyan at the
-   junction); the comet head highlight uses `hot`. */
 function beamMaterial(intensity, tail, progressUniform, colA, colB, hot) {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -680,13 +1048,12 @@ const mainBeamMat = (i, tail) =>
 const tribBeamMat = (i, tail) =>
   beamMaterial(i, tail, tribUniforms.uProgress, COL.coral, COL.cyan, COL.coralHot);
 
-const coreTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 700, 0.22, 8, false), mainBeamMat(1.4, 5.0));
-const glowTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 700, 1.1, 10, false), mainBeamMat(0.32, 7.0));
-const hazeTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 500, 2.4, 10, false), mainBeamMat(0.06, 9.0));
+const coreTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 800, 0.22, 8, false), mainBeamMat(1.4, 5.0));
+const glowTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 800, 1.1, 10, false), mainBeamMat(0.32, 7.0));
+const hazeTube = new THREE.Mesh(new THREE.TubeGeometry(curve, 600, 2.4, 10, false), mainBeamMat(0.06, 9.0));
 scene.add(coreTube, glowTube, hazeTube);
 
-/* tributaries: a coral line down from every skyscraper, all merging at
-   the junction where the colour blends into the main beam's cyan. */
+/* tributaries: a coral line down from every skyscraper */
 for (const t of towers) {
   const dir = new THREE.Vector3(JUNCTION.x - t.x, 0, JUNCTION.z - t.z).normalize();
   const tCurve = new THREE.CatmullRomCurve3(
@@ -744,21 +1111,13 @@ const headCore = headSprite(glowTexCore, 2.0, 0.95);
 /*  Halftone dot field that lights up around the comet                 */
 /* ------------------------------------------------------------------ */
 
-const dotSamples = [];
-{
-  const N = 900;
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    dotSamples.push({ t, p: curve.getPointAt(t) });
-  }
-}
 const dotData = [];
 {
   const STEP = 1.9;
   const BAND = 17;
-  for (let gx = 8; gx <= 258; gx += STEP) {
+  for (let gx = 8; gx <= 262; gx += STEP) {
     let best = null;
-    for (const s of dotSamples) {
+    for (const s of routeSamples) {
       if (Math.abs(s.p.x - gx) > 8) continue;
       if (!best || Math.abs(s.p.x - gx) < Math.abs(best.p.x - gx)) best = s;
     }
@@ -768,7 +1127,7 @@ const dotData = [];
       const gz = best.p.z + dz;
       let near = best;
       let nd = Infinity;
-      for (const s of dotSamples) {
+      for (const s of routeSamples) {
         if (Math.abs(s.p.x - gx) > 8) continue;
         const d = (s.p.x - gx) ** 2 + (s.p.z - gz) ** 2;
         if (d < nd) {
@@ -862,17 +1221,32 @@ scene.add(dots);
 
 const MERGE_END = 0.1;
 
+/* scroll progress at which the comet reaches a world position — derived
+   from the curve so camera keys and step switches line up exactly */
+function pAt(x, z) {
+  return MERGE_END + ((nearestT(x, z) - 0.01) / 0.99) * (1 - MERGE_END);
+}
+const P_HQ = pAt(HQ_POS.x, HQ_POS.z);
+const P_CLUB = pAt(CLUB_POS.x, CLUB_POS.z);
+const P_PITCH = pAt(FIELD.x, FIELD.z);
+const P_GOAL = pAt(FIELD.x + FIELD.len / 2, FIELD.z);
+const P_APP = pAt(APP_POS.x, APP_POS.z + 1);
+const P_TRAIN = pAt(TRAIN_POS.x, TRAIN_POS.z + 2.5);
+const P_TROPHY = pAt(TROPHY_POS.x, TROPHY_POS.z);
+
 const camKeys = [
   { p: 0.0, az: 2.5, el: 0.5, dist: 145 }, /* wide on the skyline */
   { p: 0.12, az: 2.6, el: 0.65, dist: 112 },
-  { p: 0.29, az: 2.7, el: 0.78, dist: 100 }, /* company HQ */
-  { p: 0.45, az: 2.35, el: 0.8, dist: 105 }, /* clubhouse */
-  { p: 0.57, az: 2.5, el: 1.0, dist: 130 }, /* pitch, near top-down */
-  { p: 0.7, az: 2.35, el: 0.78, dist: 102 }, /* out through the goal */
-  { p: 0.82, az: 2.2, el: 0.66, dist: 96 }, /* trophy leap, low + close */
-  { p: 0.93, az: 2.3, el: 0.76, dist: 100 },
-  { p: 1.0, az: 2.1, el: 0.82, dist: 112 }, /* member tile finale */
-];
+  { p: P_HQ, az: 2.7, el: 0.78, dist: 100 }, /* company HQ */
+  { p: P_CLUB, az: 2.35, el: 0.8, dist: 105 }, /* clubhouse */
+  { p: P_PITCH, az: 2.5, el: 1.0, dist: 130 }, /* pitch, near top-down */
+  { p: P_GOAL, az: 2.4, el: 0.8, dist: 105 }, /* out through the goal */
+  { p: P_APP, az: 2.3, el: 0.5, dist: 40 }, /* zoom onto the app users */
+  { p: P_TRAIN, az: 2.55, el: 0.68, dist: 72 }, /* training corner */
+  { p: P_TROPHY, az: 2.2, el: 0.66, dist: 96 }, /* trophy leap */
+  { p: (P_TROPHY + 1) / 2, az: 2.3, el: 0.8, dist: 90 },
+  { p: 1.0, az: 2.15, el: 1.05, dist: 34 }, /* bird's-eye onto the member */
+].sort((a, b) => a.p - b.p);
 
 function camAt(p) {
   let i = 0;
@@ -904,7 +1278,7 @@ ScrollTrigger.create({
 /* ------------------------------------------------------------------ */
 
 const stepEls = Array.from(document.querySelectorAll(".step"));
-const stepThresholds = [0, 0.29, 0.57, 0.8];
+const stepThresholds = [0, P_HQ - 0.04, P_CLUB - 0.03, P_APP - 0.03, P_TRAIN - 0.02, P_TROPHY - 0.02];
 let activeStep = -1;
 
 function setActiveStep(idx) {
@@ -923,6 +1297,8 @@ const headPos = new THREE.Vector3();
 const lookPos = new THREE.Vector3();
 const camTargetPos = new THREE.Vector3();
 const camCurrentLook = new THREE.Vector3();
+const memberWhite = new THREE.Color(0xffffff);
+const memberBlue = new THREE.Color(0x2b2bd6);
 let firstFrame = true;
 
 function tick() {
@@ -954,6 +1330,20 @@ function tick() {
   beamLight.position.set(headPos.x, headPos.y + 3, headPos.z);
   beamLight.intensity = 60 * charge;
 
+  /* sliding doors: open just before the beam arrives, close after */
+  for (const d of doors) {
+    const open =
+      THREE.MathUtils.smoothstep(t, d.td - 0.045, d.td - 0.012) *
+      (1 - THREE.MathUtils.smoothstep(t, d.td + 0.05, d.td + 0.09));
+    d.panelA.position.z = d.baseA.z - open * d.slide;
+    d.panelB.position.z = d.baseB.z + open * d.slide;
+  }
+
+  /* phone screens flicker softly */
+  for (let i = 0; i < phoneScreens.length; i++) {
+    phoneScreens[i].material.emissiveIntensity = 1.2 + Math.sin(time * 5 + i * 2.1) * 0.35;
+  }
+
   /* member halo: staggered rings pulsing outward once the beam arrives */
   const arrive = THREE.MathUtils.smoothstep(p, 0.94, 1);
   const ringRadii = [];
@@ -964,11 +1354,11 @@ function tick() {
     const spread = 5 + phase * 30;
     ring.scale.setScalar(Math.max(spread * arrive, 0.001));
     ring.material.opacity = arrive * Math.pow(1 - phase, 1.6) * 0.6;
-    ringRadii.push(spread / 2); /* the texture ring sits at half the plane size */
+    ringRadii.push(spread / 2);
     ringStrengths.push(Math.pow(1 - phase, 1.6));
   }
 
-  /* the surrounding tiles ride the wave: lift + flash as each pulse passes */
+  /* surrounding tiles ride the wave: lift + flash as each pulse passes */
   for (const tile of finaleTiles) {
     let bump = 0;
     for (let r = 0; r < ringRadii.length; r++) {
@@ -982,11 +1372,12 @@ function tick() {
     tile.mat.emissive.copy(tileEmissiveTmp);
   }
 
-  /* the member celebrates: gentle bounce + confetti fountain */
-  const memberFig = memberRings.figure;
-  if (memberFig) {
-    memberFig.scale.setScalar(1 + arrive * 0.07 * Math.max(Math.sin(time * 3.4), 0));
-  }
+  /* the member celebrates: jersey turns club blue, ball appears, bounce */
+  memberRings.bodyMat.color.lerpColors(memberWhite, memberBlue, arrive);
+  memberRings.ball.scale.setScalar(Math.max(arrive, 0.001));
+  memberRings.ball.rotation.y = time * 0.8;
+  memberRings.figure.scale.setScalar(1 + arrive * 0.07 * Math.max(Math.sin(time * 3.4), 0));
+
   confetti.mesh.visible = arrive > 0.01;
   if (confetti.mesh.visible) {
     for (let i = 0; i < CONFETTI; i++) {
@@ -1053,4 +1444,4 @@ window.addEventListener("resize", () => {
 gsap.from(container, { opacity: 0, duration: 0.9, ease: "power2.out" });
 
 /* debug hooks for automated visual checks */
-window.__viz = { scene, camera, renderer, curve };
+window.__viz = { scene, camera, renderer, curve, progress, marks: { P_HQ, P_CLUB, P_PITCH, P_GOAL, P_APP, P_TRAIN, P_TROPHY } };
