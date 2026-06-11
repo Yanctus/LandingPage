@@ -635,19 +635,64 @@ function pitchTexture() {
   }
 }
 
-/* --- people ------------------------------------------------------------ */
-const peopleMat = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, roughness: 0.9 });
-const peopleMat2 = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.9 });
-function person(x, z, s = 1, mat = peopleMat) {
+/* --- people: little humans with legs, arms, shirts and hair ------------- */
+const SKIN = [0xf0d6c0, 0xe3bd9a, 0xc98e6b, 0xf3e0cd];
+const SHIRT = [0x7f9fc9, 0xd97f86, 0x8fc9a0, 0xe8e3d5, 0x6f7fae, 0xc9b27f, 0xa8c4d4, 0x2b2bd6];
+const PANTS = [0x5c6675, 0x8694a8, 0x4a4f5c, 0x7a8294, 0x3e4654];
+const HAIR = [0x3a3128, 0x6b5638, 0xa8825c, 0x22242a, 0x8a8d94, 0x5c4330];
+const matCache = new Map();
+function cmat(hex) {
+  if (!matCache.has(hex)) matCache.set(hex, new THREE.MeshStandardMaterial({ color: hex, roughness: 0.85 }));
+  return matCache.get(hex);
+}
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const allPeople = [];
+
+function person(x, z, s = 1, opts = {}) {
   const g = new THREE.Group();
-  const bodyM = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * s, 0.5 * s, 4, 8), mat);
-  bodyM.position.y = 0.45 * s;
-  bodyM.castShadow = true;
-  g.add(bodyM);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 10, 8), mat);
-  head.position.y = 0.95 * s;
+  const shirt = opts.shirtMat ?? cmat(pick(SHIRT));
+  const pants = opts.pantsMat ?? cmat(pick(PANTS));
+  const skin = cmat(pick(SKIN));
+  const hair = cmat(pick(HAIR));
+  /* legs */
+  for (const sgn of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.065 * s, 0.34 * s, 3, 6), pants);
+    leg.position.set(sgn * 0.085 * s, 0.27 * s, 0);
+    g.add(leg);
+  }
+  /* torso */
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.145 * s, 0.34 * s, 4, 8), shirt);
+  torso.position.y = 0.64 * s;
+  torso.castShadow = true;
+  g.add(torso);
+  /* arms on shoulder pivots (so they can be raised) */
+  const arms = [];
+  for (const sgn of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.048 * s, 0.3 * s, 3, 6), shirt);
+    arm.geometry = arm.geometry.clone();
+    arm.geometry.translate(0, -0.17 * s, 0);
+    const pivot = new THREE.Group();
+    pivot.position.set(sgn * 0.21 * s, 0.8 * s, 0);
+    pivot.rotation.z = sgn * 0.16;
+    pivot.userData.sgn = sgn;
+    pivot.add(arm);
+    g.add(pivot);
+    arms.push(pivot);
+  }
+  /* head + hair */
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13 * s, 12, 10), skin);
+  head.position.y = 1.04 * s;
   g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.136 * s, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
+  cap.position.y = 1.06 * s;
+  cap.rotation.x = -0.18;
+  g.add(cap);
+
   g.position.set(x, 0, z);
+  g.rotation.y = opts.face ?? Math.random() * Math.PI * 2;
+  g.userData.arms = arms;
+  g.userData.swayPhase = Math.random() * Math.PI * 2;
+  allPeople.push(g);
   world.add(g);
   return g;
 }
@@ -656,12 +701,7 @@ function crowdCluster(cx, cz, n) {
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
     const r = 0.6 + Math.random() * 1.6;
-    person(
-      cx + Math.cos(a) * r,
-      cz + Math.sin(a) * r,
-      0.85 + Math.random() * 0.3,
-      Math.random() < 0.4 ? peopleMat2 : peopleMat
-    );
+    person(cx + Math.cos(a) * r, cz + Math.sin(a) * r, 0.85 + Math.random() * 0.3);
   }
 }
 
@@ -679,15 +719,21 @@ function grandstand(cx, frontZ, length, rows) {
       const mat = Math.random() < 0.12 ? MAT.blue : MAT.white;
       g.add(box(seatW, 0.55, 0.6, mat, sx, y + 0.875, z - frontZ - 0.35));
       if (Math.random() < 0.38) {
-        const pm = Math.random() < 0.4 ? peopleMat2 : peopleMat;
+        /* a seated supporter: coloured shirt, skin head, hair */
         const fan = new THREE.Group();
-        const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.3, 4, 8), pm);
+        const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.3, 4, 8), cmat(pick(SHIRT)));
         torso.position.y = 0.3;
         torso.castShadow = true;
         fan.add(torso);
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), pm);
+        const thighs = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.13, 0.34), cmat(pick(PANTS)));
+        thighs.position.set(0, 0.08, 0.22);
+        fan.add(thighs);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), cmat(pick(SKIN)));
         head.position.y = 0.72;
         fan.add(head);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.136, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), cmat(pick(HAIR)));
+        cap.position.y = 0.74;
+        fan.add(cap);
         fan.position.set(sx, y + 1.15, z - frontZ - 0.35);
         g.add(fan);
       }
@@ -711,7 +757,56 @@ crowdCluster(118, -4, 2);
 crowdCluster(76, 16, 3);
 crowdCluster(24, 12, 3);
 crowdCluster(212, -22, 2);
-crowdCluster(236, 6, 3);
+crowdCluster(248, 8, 3);
+
+/* a small kick-about on the pitch (clear of the beam's centre line) */
+{
+  const teamA = cmat(0x2b2bd6);
+  const teamB = cmat(0xd97f86);
+  person(130, 7.5, 0.95, { shirtMat: teamA, face: 0.9 });
+  person(133.5, 9.5, 0.95, { shirtMat: teamB, face: -2.2 });
+  person(149, 19.5, 0.95, { shirtMat: teamA, face: 2.4 });
+  person(121.5, 14, 0.95, { shirtMat: teamB, face: Math.PI / 2 }); /* keeper */
+  const playBall = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 14, 12),
+    new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45 })
+  );
+  playBall.position.set(131.8, 0.3, 8.4);
+  playBall.castShadow = true;
+  world.add(playBall);
+}
+
+/* a few birds circling high above bring the sky to life */
+const birds = [];
+{
+  const birdMat = cmat(0x6b7686);
+  for (let i = 0; i < 5; i++) {
+    const b = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.42, 3, 6), birdMat);
+    body.rotation.z = Math.PI / 2;
+    b.add(body);
+    const wings = [];
+    for (const sgn of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 1.1), birdMat);
+      wing.geometry = wing.geometry.clone();
+      wing.geometry.translate(0, 0, sgn * 0.55);
+      b.add(wing);
+      wings.push(wing);
+    }
+    b.userData = {
+      cx: 50 + Math.random() * 200,
+      cz: -20 + Math.random() * 40,
+      r: 14 + Math.random() * 18,
+      h: 24 + Math.random() * 10,
+      speed: 0.12 + Math.random() * 0.08,
+      phase: Math.random() * Math.PI * 2,
+      flap: 6 + Math.random() * 3,
+      wings,
+    };
+    scene.add(b);
+    birds.push(b);
+  }
+}
 
 /* --- trees, hedges, bushes ---------------------------------------------- */
 function tree(x, z, s = 1) {
@@ -857,8 +952,9 @@ house(208, 4, -0.4, 0.9);
 /* --- scene: two supporters with glowing phones -------------------------- */
 const phoneScreens = [];
 function phonePerson(x, z, faceA, s = 1.3) {
-  const g = person(x, z, s);
-  g.rotation.y = faceA;
+  const g = person(x, z, s, { face: faceA });
+  /* arms reach forward to hold the phone */
+  for (const pivot of g.userData.arms) pivot.rotation.x = -0.95;
   const phone = new THREE.Group();
   const bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.34 * s, 0.6 * s, 0.05 * s), MAT.dark);
   phone.add(bodyM);
@@ -957,8 +1053,8 @@ lamp(APP_POS.x + 4.5, APP_POS.z - 4);
     ball.castShadow = true;
     world.add(ball);
   }
-  person(TRAIN_POS.x - 2.8, TRAIN_POS.z - 1.6, 1.15, peopleMat2);
-  person(TRAIN_POS.x + 2.4, TRAIN_POS.z - 0.8, 1.0);
+  person(TRAIN_POS.x - 2.8, TRAIN_POS.z - 1.6, 1.15, { face: 0.4 });
+  person(TRAIN_POS.x + 2.4, TRAIN_POS.z - 0.8, 1.0, { face: -2.6 });
 }
 
 /* --- trophy (Pokal), solid inside --------------------------------------- */
@@ -986,9 +1082,10 @@ function trophy(x, z) {
   cup.castShadow = true;
   cup.receiveShadow = true;
   g.add(cup);
+  /* handles sit fully outside the bowl so nothing pokes into the cup */
   for (const sgn of [-1, 1]) {
-    const handle = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.3, 10, 28), MAT.white);
-    handle.position.set(sgn * 3.6, 9.0, 0);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.26, 10, 28), MAT.white);
+    handle.position.set(sgn * 4.65, 8.7, 0);
     handle.castShadow = true;
     g.add(handle);
   }
@@ -1083,23 +1180,12 @@ function bank() {
   /* sign on the architrave, between the columns */
   const sign = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.78, 0.12), [
     MAT.grey, MAT.grey, MAT.grey, MAT.grey,
-    signMaterial("BEITRÄGE & FINANZEN", "", 512, 64),
+    signMaterial("BEITRÄGE", "", 512, 64),
     MAT.grey,
   ]);
   sign.position.set(0, 6.6, 7.52);
   sign.castShadow = true;
   g.add(sign);
-
-  /* glowing rings inside — the first-person ride flies through them */
-  for (const lx of [-4.5, -1.5, 1.5, 4.5]) {
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(1.45, 0.09, 10, 28),
-      new THREE.MeshBasicMaterial({ color: 0x7fd8ff })
-    );
-    ring.position.set(lx, 1.7, 0);
-    ring.rotation.y = Math.PI / 2;
-    g.add(ring);
-  }
 
   /* doors on both gable ends — the beam rides straight through */
   for (const sgn of [-1, 1]) {
@@ -1153,19 +1239,11 @@ const memberRings = (() => {
   tile.castShadow = true;
   g.add(tile);
 
-  const memberBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-  const memberHeadMat = new THREE.MeshStandardMaterial({ color: 0xf0e6da, roughness: 0.7 });
-  const member = new THREE.Group();
-  const s = 1.7;
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * s, 0.5 * s, 4, 8), memberBodyMat);
-  torso.position.y = 0.45 * s;
-  torso.castShadow = true;
-  member.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14 * s, 10, 8), memberHeadMat);
-  head.position.y = 0.95 * s;
-  member.add(head);
+  /* the new member: a proper little human whose jersey turns club blue */
+  const memberBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
+  const memberPantsMat = new THREE.MeshStandardMaterial({ color: 0x3e4654, roughness: 0.85 });
+  const member = person(0, 0, 1.7, { shirtMat: memberBodyMat, pantsMat: memberPantsMat, face: -0.7 });
   member.position.set(MEMBER.x, 1.3, MEMBER.z);
-  world.add(member);
 
   const ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.42, 16, 14),
@@ -1218,6 +1296,7 @@ const memberRings = (() => {
   rings.figure = member;
   rings.bodyMat = memberBodyMat;
   rings.ball = ball;
+  rings.arms = member.userData.arms;
   return rings;
 })();
 
@@ -1539,34 +1618,44 @@ const dotMat = new THREE.ShaderMaterial({
     uColB: { value: new THREE.Color(0xd9f6ff) },
     uColCoral: { value: new THREE.Color(0xff8088) },
     uSwitch: { value: T_SWITCH },
+    uMouse: { value: new THREE.Vector2(9999, 9999) },
+    uMouseStr: { value: 0 },
   },
   vertexShader: /* glsl */ `
     attribute float aT;
     attribute float aFade;
     varying float vT;
     varying float vFade;
+    varying vec2 vWorld;
     void main() {
       vT = aT;
       vFade = aFade;
+      vec4 wp = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      vWorld = wp.xz;
       vec4 mv = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragmentShader: /* glsl */ `
-    uniform float uProgress, uSwitch;
+    uniform float uProgress, uSwitch, uMouseStr;
     uniform vec3 uColA, uColB, uColCoral;
+    uniform vec2 uMouse;
     varying float vT;
     varying float vFade;
+    varying vec2 vWorld;
     void main() {
       float rel = uProgress - vT;
       /* circular halo: dots glow on BOTH sides of the head */
       float burst = exp(-abs(rel) * 26.0);
       /* a residual trail only lingers behind */
       float residual = rel > 0.0 ? 0.5 * (1.0 - smoothstep(0.04, 0.30, rel)) : 0.0;
-      float i = max(burst, residual) * vFade;
+      /* the cursor carries its own little dot halo */
+      float md = length(vWorld - uMouse);
+      float mglow = exp(-md * md / 14.0) * uMouseStr;
+      float i = max(max(burst, residual) * vFade, mglow * max(vFade, 0.3));
       if (i < 0.004) discard;
       vec3 tone = mix(uColCoral, uColA, smoothstep(uSwitch - 0.012, uSwitch + 0.012, vT));
-      vec3 col = mix(tone, uColB, clamp(burst * 1.3, 0.0, 1.0));
+      vec3 col = mix(tone, uColB, clamp(max(burst, mglow) * 1.3, 0.0, 1.0));
       gl_FragColor = vec4(col, i);
     }
   `,
@@ -1597,6 +1686,29 @@ const dots = new THREE.InstancedMesh(dotGeo, dotMat, DOTS);
   dotGeo.setAttribute("aFade", new THREE.InstancedBufferAttribute(aFade, 1));
 }
 scene.add(dots);
+
+/* the mouse paints its own dot halo on the ground */
+const mouseFx = { tx: 9999, tz: 9999, x: 9999, z: 9999, str: 0, lastMove: -10 };
+{
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const hit = new THREE.Vector3();
+  window.addEventListener("pointermove", (e) => {
+    ndc.x = (e.clientX / window.innerWidth) * 2 - 1;
+    ndc.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    ray.setFromCamera(ndc, camera);
+    if (ray.ray.intersectPlane(plane, hit)) {
+      if (mouseFx.x > 9000) {
+        mouseFx.x = hit.x;
+        mouseFx.z = hit.z;
+      }
+      mouseFx.tx = hit.x;
+      mouseFx.tz = hit.z;
+      mouseFx.lastMove = clock.elapsedTime;
+    }
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /*  Camera rig driven by scroll                                        */
@@ -1690,7 +1802,6 @@ const clock = new THREE.Clock();
 const headPos = new THREE.Vector3();
 const lookPos = new THREE.Vector3();
 const headTan = new THREE.Vector3();
-const povPos = new THREE.Vector3();
 const camTargetPos = new THREE.Vector3();
 const camCurrentLook = new THREE.Vector3();
 const memberWhite = new THREE.Color(0xffffff);
@@ -1718,17 +1829,13 @@ function tick() {
   curve.getPointAt(Math.min(t + 0.04, 1), lookPos);
   curve.getTangentAt(t, headTan);
 
-  /* first-person ride through the finance hall */
-  const povBlend =
-    THREE.MathUtils.smoothstep(p, P_BANK_IN - 0.02, P_BANK_IN) *
-    (1 - THREE.MathUtils.smoothstep(p, P_BANK_OUT, P_BANK_OUT + 0.025));
-
   headBig.position.copy(headPos);
   headMid.position.copy(headPos);
   headCore.position.copy(headPos);
-  const charge = THREE.MathUtils.clamp(p / MERGE_END, 0.25, 1);
-  /* hide the glow inside buildings; also shrink for the FP camera */
-  const vis = headVisibility(t) * (1 - povBlend * 0.85);
+  /* the glow is alive from the very first frame */
+  const charge = 0.85 + 0.15 * THREE.MathUtils.clamp(p / MERGE_END, 0, 1);
+  /* hide the glow while it travels inside a building */
+  const vis = headVisibility(t);
   const pulse = (1 + Math.sin(time * 6) * 0.07) * charge * Math.max(vis, 0.001);
   headBig.scale.setScalar(13 * pulse);
   headMid.scale.setScalar(5.5 * pulse);
@@ -1743,6 +1850,31 @@ function tick() {
 
   /* the club flag waves gently */
   if (flagMesh) flagMesh.rotation.y = Math.sin(time * 2.4) * 0.22 + Math.sin(time * 5.1) * 0.06;
+
+  /* cursor dot halo follows the mouse across the ground */
+  const wantStr = time - mouseFx.lastMove < 1.4 ? 1 : 0;
+  mouseFx.str += (wantStr - mouseFx.str) * (1 - Math.exp(-dt * 5));
+  mouseFx.x += (mouseFx.tx - mouseFx.x) * (1 - Math.exp(-dt * 12));
+  mouseFx.z += (mouseFx.tz - mouseFx.z) * (1 - Math.exp(-dt * 12));
+  dotMat.uniforms.uMouse.value.set(mouseFx.x, mouseFx.z);
+  dotMat.uniforms.uMouseStr.value = mouseFx.str;
+
+  /* everyone sways a little — no more statues */
+  for (let i = 0; i < allPeople.length; i++) {
+    const g = allPeople[i];
+    g.rotation.z = Math.sin(time * 1.5 + g.userData.swayPhase) * 0.045;
+  }
+
+  /* birds circle and flap */
+  for (const b of birds) {
+    const d = b.userData;
+    const a = time * d.speed * Math.PI * 2 + d.phase;
+    b.position.set(d.cx + Math.cos(a) * d.r, d.h + Math.sin(time * 0.7 + d.phase) * 1.5, d.cz + Math.sin(a) * d.r);
+    b.rotation.y = -a - Math.PI / 2;
+    const flap = Math.sin(time * d.flap) * 0.55;
+    d.wings[0].rotation.x = flap;
+    d.wings[1].rotation.x = -flap;
+  }
   /* the light matches the line colour: coral before the HQ, cyan after */
   beamLight.color.lerpColors(lightCoral, lightCyan, THREE.MathUtils.smoothstep(t, T_SWITCH - 0.012, T_SWITCH + 0.012));
 
@@ -1788,6 +1920,11 @@ function tick() {
   memberRings.ball.scale.setScalar(Math.max(arrive, 0.001));
   memberRings.ball.rotation.y = time * 0.8;
   memberRings.figure.scale.setScalar(1 + arrive * 0.07 * Math.max(Math.sin(time * 3.4), 0));
+  /* arms shoot up in celebration as the beam arrives */
+  for (const pivot of memberRings.arms) {
+    const sgn = pivot.userData.sgn;
+    pivot.rotation.z = sgn * (0.16 + arrive * (2.3 + Math.sin(time * 3.4) * 0.12));
+  }
 
   confetti.mesh.visible = arrive > 0.01;
   if (confetti.mesh.visible) {
@@ -1810,24 +1947,19 @@ function tick() {
     confetti.mesh.instanceMatrix.needsUpdate = true;
   }
 
-  /* camera: orbit rig blended with the first-person ride */
+  /* camera: keyframed orbit around the comet */
   const ck = camAt(p);
   camTargetPos.set(
     headPos.x + Math.cos(ck.az) * Math.cos(ck.el) * ck.dist,
     headPos.y + Math.sin(ck.el) * ck.dist,
     headPos.z + Math.sin(ck.az) * Math.cos(ck.el) * ck.dist
   );
-  if (povBlend > 0.001) {
-    povPos.copy(headPos).addScaledVector(headTan, -2.8);
-    povPos.y += 0.95;
-    camTargetPos.lerp(povPos, povBlend);
-  }
   if (firstFrame) {
     camera.position.copy(camTargetPos);
     camCurrentLook.copy(headPos);
     firstFrame = false;
   } else {
-    const ck2 = 1 - Math.exp(-dt * (4.5 + povBlend * 6));
+    const ck2 = 1 - Math.exp(-dt * 4.5);
     camera.position.lerp(camTargetPos, ck2);
     camCurrentLook.lerp(lookPos, ck2);
   }
