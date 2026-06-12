@@ -841,6 +841,17 @@ function skyscraper(x, z, w, h, d, ry = 0) {
   g.add(body);
   g.add(box(w + 0.5, 0.6, d + 0.5, MAT.grey, 0, h + 0.3, 0));
   if (h > 20) g.add(box(w * 0.45, 2.2, d * 0.45, MAT.light, w * 0.1, h + 1.7, -d * 0.1));
+  /* rooftop clutter: AC units, vents, antenna */
+  g.add(box(1.1, 0.55, 0.8, MAT.light, -w * 0.25, h + 0.88, d * 0.22, 0.2));
+  g.add(box(0.7, 0.45, 0.7, MAT.dark, w * 0.28, h + 0.83, d * 0.28, -0.3));
+  if (h > 18) {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 2.6, 6), MAT.dark);
+    ant.position.set(-w * 0.3, h + 1.9, -d * 0.3);
+    g.add(ant);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), cmat(0xff6a72));
+    tip.position.set(-w * 0.3, h + 3.25, -d * 0.3);
+    g.add(tip);
+  }
   g.position.set(x, 0, z);
   g.rotation.y = ry;
   world.add(g);
@@ -877,6 +888,12 @@ function buildHQ() {
   annexB.receiveShadow = true;
   g.add(annexB);
   g.add(box(9.6, 0.7, 9.6, MAT.grey, 0, 11.1, 0));
+  /* rooftop: AC units + antenna */
+  g.add(box(1.5, 0.7, 1.1, MAT.light, 2.2, 11.8, -2, 0.15));
+  g.add(box(1.0, 0.55, 1.0, MAT.dark, -2.4, 11.72, 1.8, -0.2));
+  const hqAnt = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 3, 6), MAT.dark);
+  hqAnt.position.set(-3.2, 13, -3);
+  g.add(hqAnt);
 
   for (const sgn of [-1, 1]) {
     g.add(box(0.5, 3.2, 4.6, MAT.grey, sgn * 4.45, 1.6, 0));
@@ -940,6 +957,9 @@ function clubhouse(x, z) {
   roof.castShadow = true;
   roof.receiveShadow = true;
   g.add(roof);
+  g.add(box(10.5, 0.12, 0.24, MAT.grey, 0, 5.56, 0));
+  g.add(box(0.55, 1.1, 0.55, MAT.grey, -3, 5.1, 0.8));
+  g.add(box(0.7, 0.12, 0.7, MAT.dark, -3, 5.7, 0.8));
   g.add(box(10.6, 0.3, 2.4, MAT.grey, 0, 0.15, 4.3));
   const clubWin = new THREE.MeshStandardMaterial({ color: T.dark, roughness: 0.7, emissive: 0xffd98a, emissiveIntensity: 0 });
   litWindows.club = clubWin;
@@ -1056,6 +1076,66 @@ kickBall.position.set(146, 0.32, 14);
 kickBall.castShadow = true;
 world.add(kickBall);
 const T_KICK = nearestT(146, 14);
+const T_GOAL = T_KICK + 0.016;
+
+/* GOAL celebration: expanding shockwave ring, particle burst, light */
+const goalFx = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const ctx = c.getContext("2d");
+  ctx.strokeStyle = "rgba(140,225,255,0.95)";
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.arc(128, 128, 98, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 30;
+  ctx.beginPath();
+  ctx.arc(128, 128, 84, 0, Math.PI * 2);
+  ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const ring = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  ring.position.set(160.6, 1.4, 14);
+  scene.add(ring);
+
+  const N = 56;
+  const burst = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(0.22, 0.22),
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    N
+  );
+  burst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const col = new THREE.Color();
+  const data = [];
+  for (let i = 0; i < N; i++) {
+    burst.setColorAt(i, col.setHex(i % 3 ? 0x8fe0ff : 0xffffff));
+    const a = Math.random() * Math.PI * 2;
+    const elv = Math.random() * 1.2;
+    data.push({
+      dx: Math.cos(a) * Math.cos(elv),
+      dy: Math.sin(elv) + 0.3,
+      dz: Math.sin(a) * Math.cos(elv),
+      speed: 4 + Math.random() * 6,
+      spin: Math.random() * 9,
+    });
+  }
+  burst.visible = false;
+  scene.add(burst);
+
+  const light = new THREE.PointLight(0x9fe4ff, 0, 30, 1.8);
+  light.position.set(160.6, 2, 14);
+  scene.add(light);
+  return { ring, burst, data, light, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), s: new THREE.Vector3() };
+})();
 
 /* --- people: little humans with legs, arms, shirts and hair ------------- */
 const SKIN = [0xf0d6c0, 0xe3bd9a, 0xc98e6b, 0xf3e0cd];
@@ -1064,51 +1144,107 @@ const PANTS = [0x5c6675, 0x8694a8, 0x4a4f5c, 0x7a8294, 0x3e4654];
 const HAIR = [0x3a3128, 0x6b5638, 0xa8825c, 0x22242a, 0x8a8d94, 0x5c4330];
 const allPeople = [];
 
+const gesturers = [];
 function person(x, z, s = 1, opts = {}) {
   const g = new THREE.Group();
   const shirt = opts.shirtMat ?? cmat(pick(SHIRT));
   const pants = opts.pantsMat ?? cmat(pick(PANTS));
   const skin = cmat(pick(SKIN));
   const hair = cmat(pick(HAIR));
-  /* legs */
+  const shoes = cmat(0x2e3340);
+  const female = opts.female ?? Math.random() < 0.45;
+  const skirt = female && Math.random() < 0.5;
+
+  /* legs on hip pivots, with shoes — walkers can swing them */
+  const legs = [];
   for (const sgn of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.065 * s, 0.34 * s, 3, 6), pants);
-    leg.position.set(sgn * 0.085 * s, 0.27 * s, 0);
-    g.add(leg);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.058 * s, 0.3 * s, 3, 6), skirt ? skin : pants);
+    leg.geometry = leg.geometry.clone();
+    leg.geometry.translate(0, -0.18 * s, 0);
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s, 0.06 * s, 0.17 * s), shoes);
+    shoe.position.set(0, -0.36 * s, 0.03 * s);
+    const hip = new THREE.Group();
+    hip.position.set(sgn * 0.08 * s, 0.43 * s, 0);
+    hip.add(leg);
+    hip.add(shoe);
+    g.add(hip);
+    legs.push(hip);
   }
-  /* torso */
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.145 * s, 0.34 * s, 4, 8), shirt);
-  torso.position.y = 0.64 * s;
+  /* hips / skirt */
+  if (skirt) {
+    const sk = new THREE.Mesh(new THREE.ConeGeometry(0.17 * s, 0.26 * s, 10), shirt);
+    sk.position.y = 0.44 * s;
+    g.add(sk);
+  } else {
+    const hips = new THREE.Mesh(new THREE.BoxGeometry(0.24 * s, 0.16 * s, 0.16 * s), pants);
+    hips.position.y = 0.46 * s;
+    g.add(hips);
+  }
+  /* torso with shoulders */
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.13 * s, 0.3 * s, 4, 8), shirt);
+  torso.position.y = 0.68 * s;
   torso.castShadow = true;
   g.add(torso);
-  /* arms on shoulder pivots (so they can be raised) */
+  /* neck */
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * s, 0.045 * s, 0.07 * s, 8), skin);
+  neck.position.y = 0.93 * s;
+  g.add(neck);
+  /* arms on shoulder pivots, with skin hands */
   const arms = [];
   for (const sgn of [-1, 1]) {
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.048 * s, 0.3 * s, 3, 6), shirt);
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.04 * s, 0.26 * s, 3, 6), shirt);
     arm.geometry = arm.geometry.clone();
-    arm.geometry.translate(0, -0.17 * s, 0);
+    arm.geometry.translate(0, -0.15 * s, 0);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045 * s, 8, 6), skin);
+    hand.position.y = -0.31 * s;
     const pivot = new THREE.Group();
-    pivot.position.set(sgn * 0.21 * s, 0.8 * s, 0);
-    pivot.rotation.z = sgn * 0.16;
+    pivot.position.set(sgn * 0.185 * s, 0.86 * s, 0);
+    pivot.rotation.z = sgn * 0.14;
     pivot.userData.sgn = sgn;
     pivot.add(arm);
+    pivot.add(hand);
     g.add(pivot);
     arms.push(pivot);
   }
-  /* head + hair */
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13 * s, 12, 10), skin);
-  head.position.y = 1.04 * s;
+  /* head (slightly oval) + hair variants */
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115 * s, 12, 10), skin);
+  head.scale.y = 1.12;
+  head.position.y = 1.06 * s;
   g.add(head);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.136 * s, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
-  cap.position.y = 1.06 * s;
-  cap.rotation.x = -0.18;
-  g.add(cap);
+  const style = Math.random();
+  if (style > 0.12) {
+    /* short hair cap */
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.122 * s, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
+    cap.position.y = 1.085 * s;
+    cap.rotation.x = -0.2;
+    g.add(cap);
+  }
+  if (female && style > 0.35) {
+    /* ponytail */
+    const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.035 * s, 0.16 * s, 3, 6), hair);
+    tail.position.set(0, 1.0 * s, -0.13 * s);
+    tail.rotation.x = 0.5;
+    g.add(tail);
+  } else if (!female && style > 0.78) {
+    /* baseball cap with brim */
+    const capHat = new THREE.Mesh(new THREE.SphereGeometry(0.125 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), cmat(pick(SHIRT)));
+    capHat.position.y = 1.09 * s;
+    g.add(capHat);
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.14 * s, 0.02 * s, 0.12 * s), capHat.material);
+    brim.position.set(0, 1.08 * s, 0.14 * s);
+    g.add(brim);
+  }
 
   g.position.set(x, 0, z);
   g.rotation.y = opts.face ?? Math.random() * Math.PI * 2;
   g.userData.arms = arms;
+  g.userData.legs = legs;
   g.userData.swayPhase = Math.random() * Math.PI * 2;
   allPeople.push(g);
+  /* some people talk with their hands */
+  if (!opts.noGesture && Math.random() < 0.22) {
+    gesturers.push({ pivot: arms[0], phase: Math.random() * Math.PI * 2 });
+  }
   world.add(g);
   return g;
 }
@@ -1122,6 +1258,7 @@ function crowdCluster(cx, cz, n) {
 }
 
 /* --- grandstand, flush with the pitch's north touchline ---------------- */
+const stadiumFans = [];
 function grandstand(cx, frontZ, length, rows) {
   const g = new THREE.Group();
   const seatW = 0.72;
@@ -1152,6 +1289,7 @@ function grandstand(cx, frontZ, length, rows) {
         fan.add(cap);
         fan.position.set(sx, y + 1.15, z - frontZ - 0.35);
         g.add(fan);
+        stadiumFans.push({ grp: fan, baseY: y + 1.15, phase: Math.random() * 6 });
       }
     }
   }
@@ -1227,6 +1365,29 @@ const birds = [];
     };
     scene.add(b);
     birds.push(b);
+  }
+}
+
+/* pedestrians that actually walk — short patrols beside the route */
+const walkers = [];
+{
+  const UPv = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < 10; i++) {
+    const tt = 0.06 + Math.random() * 0.88;
+    const p = curve.getPointAt(tt);
+    const tan = curve.getTangentAt(tt);
+    const side = new THREE.Vector3().crossVectors(tan, UPv).normalize();
+    const off = (Math.random() < 0.5 ? -1 : 1) * (4.5 + Math.random() * 3);
+    const ax = p.x + side.x * off - tan.x * 5;
+    const az = p.z + side.z * off - tan.z * 5;
+    const bx = p.x + side.x * off + tan.x * 5;
+    const bz = p.z + side.z * off + tan.z * 5;
+    const mx = (ax + bx) / 2;
+    const mz = (az + bz) / 2;
+    if (Math.abs(mx - FIELD.x) < 34 && Math.abs(mz - FIELD.z) < 26) continue;
+    if (mx > 114 && mx < 166 && mz > -14 && mz < 2) continue;
+    const w = person(ax, az, 0.9 + Math.random() * 0.25, { noGesture: true });
+    walkers.push({ g: w, ax, az, bx, bz, speed: 0.045 + Math.random() * 0.04, phase: Math.random() });
   }
 }
 
@@ -1327,8 +1488,15 @@ function house(x, z, ry = 0, s = 1) {
   roof.castShadow = true;
   roof.receiveShadow = true;
   g.add(roof);
+  /* ridge cap, chimney with crown, door step and window sills */
+  g.add(box(0.2 * s, 0.1 * s, 5.7 * s, MAT.grey, 0, 4.31 * s, 0));
+  g.add(box(0.45 * s, 0.95 * s, 0.45 * s, MAT.grey, 1.25 * s, 3.65 * s, -1.2 * s));
+  g.add(box(0.6 * s, 0.12 * s, 0.6 * s, MAT.dark, 1.25 * s, 4.16 * s, -1.2 * s));
   g.add(box(0.9 * s, 1.6 * s, 0.1, MAT.dark, 0.8 * s, 0.8 * s, 2.62 * s));
+  g.add(box(1.1 * s, 0.1 * s, 0.5 * s, MAT.grey, 0.8 * s, 0.05 * s, 2.85 * s));
   g.add(box(1.1 * s, 0.8 * s, 0.1, MAT.dark, -1.1 * s, 1.5 * s, 2.62 * s));
+  g.add(box(1.2 * s, 0.08 * s, 0.16 * s, MAT.grey, -1.1 * s, 1.06 * s, 2.66 * s));
+  g.add(box(0.9 * s, 0.7 * s, 0.1, MAT.dark, 0, 1.5 * s, -2.62 * s));
   g.position.set(x, 0, z);
   g.rotation.y = ry;
   world.add(g);
@@ -1391,26 +1559,6 @@ function district(cx, cz) {
   if (Math.random() < 0.7) lamp(cx, cz - 6.5);
   if (Math.random() < 0.7) bench(cx + 4.5, cz + 5.5, Math.random());
   if (Math.random() < 0.5) car(cx - 6.5, cz + 1, 1.55);
-}
-
-function pond(x, z, rx = 6.5, rz = 4.6) {
-  const rim = new THREE.Mesh(new THREE.CircleGeometry(1.08, 28), MAT.light);
-  rim.rotation.x = -Math.PI / 2;
-  rim.scale.set(rx, rz, 1);
-  rim.position.set(x, 0.035, z);
-  world.add(rim);
-  const water = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 28),
-    new THREE.MeshStandardMaterial({ color: T.water, roughness: 0.25 })
-  );
-  water.rotation.x = -Math.PI / 2;
-  water.scale.set(rx, rz, 1);
-  water.position.set(x, 0.055, z);
-  world.add(water);
-  tree(x - rx - 1.5, z - 1, 1.05);
-  tree(x + rx + 1, z + 1.5, 0.85);
-  bench(x, z - rz - 1.4, 0);
-  bush(x + rx, z - rz, 0.8);
 }
 
 function flatCanvasCourt(w, h, draw) {
@@ -1559,7 +1707,8 @@ district(92, 40);
 district(152, 44);
 district(216, 12);
 district(256, -26);
-pond(58, 36);
+grove(58, 36, 4, 5);
+bench(58, 32, 0.3);
 playground(78, 30);
 tennisCourt(124, 36, 0.08);
 basketballCourt(190, 14, -0.15);
@@ -1922,7 +2071,7 @@ const memberRings = (() => {
   /* the new member: a proper little human whose jersey turns club blue */
   const memberBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
   const memberPantsMat = new THREE.MeshStandardMaterial({ color: 0x3e4654, roughness: 0.85 });
-  const member = person(0, 0, 1.7, { shirtMat: memberBodyMat, pantsMat: memberPantsMat, face: -0.7 });
+  const member = person(0, 0, 1.7, { shirtMat: memberBodyMat, pantsMat: memberPantsMat, face: -0.7, noGesture: true });
   member.position.set(MEMBER.x, 1.3, MEMBER.z);
 
   const ball = new THREE.Mesh(
@@ -2028,8 +2177,10 @@ const tribUniforms = { uProgress: { value: 0 } };
 
 /* the colour flips from colA to colB exactly at uSwitch (HQ entrance) */
 const T_SWITCH = nearestT(HQ_POS.x, HQ_POS.z);
+/* the cyan line + comet are born at the HQ's exit door */
+const T_START = nearestT(HQ_POS.x + 4.6, HQ_POS.z);
 
-function beamMaterial(intensity, tail, progressUniform, colA, colB, hot, tSwitch = T_SWITCH) {
+function beamMaterial(intensity, tail, progressUniform, colA, colB, hot, tSwitch = T_SWITCH, tStart = 0) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uProgress: progressUniform,
@@ -2039,6 +2190,7 @@ function beamMaterial(intensity, tail, progressUniform, colA, colB, hot, tSwitch
       uIntensity: { value: intensity },
       uTail: { value: tail },
       uSwitch: { value: tSwitch },
+      uStart: { value: tStart },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -2048,13 +2200,13 @@ function beamMaterial(intensity, tail, progressUniform, colA, colB, hot, tSwitch
       }
     `,
     fragmentShader: /* glsl */ `
-      uniform float uProgress, uIntensity, uTail, uSwitch;
+      uniform float uProgress, uIntensity, uTail, uSwitch, uStart;
       uniform vec3 uColA, uColB, uHot;
       varying vec2 vUv;
       void main() {
         float t = vUv.x;
         float rel = uProgress - t;
-        if (rel < 0.0) discard;
+        if (rel < 0.0 || t < uStart) discard;
         float head = exp(-rel * 220.0);
         float body = exp(-rel * uTail);
         float a = (head * 1.6 + body * 0.6) * uIntensity;
@@ -2071,7 +2223,7 @@ function beamMaterial(intensity, tail, progressUniform, colA, colB, hot, tSwitch
 
 /* main beam: coral until the HQ, cyan afterwards */
 const mainBeamMat = (i, tail) =>
-  beamMaterial(i, tail, beamUniforms.uProgress, COL.coral, COL.cyan, COL.cyanHot);
+  beamMaterial(i, tail, beamUniforms.uProgress, COL.coral, COL.cyan, COL.cyanHot, T_SWITCH, T_START);
 /* tributaries stay coral the whole way (switch beyond range) */
 const tribBeamMat = (i, tail) =>
   beamMaterial(i, tail, tribUniforms.uProgress, COL.coral, COL.coral, COL.coralHot, 2);
@@ -2085,10 +2237,10 @@ scene.add(coreTube, glowTube, hazeTube);
    parallel bundle alongside the main line all the way to the HQ door */
 {
   const UP = new THREE.Vector3(0, 1, 0);
-  const T_DOOR = nearestT(HQ_POS.x - 4.6, HQ_POS.z);
+  const T_DOOR = nearestT(HQ_POS.x - 1.2, HQ_POS.z); /* lanes run inside the hall */
   const T_JOIN = 0.012;
   towers.forEach((tw, i) => {
-    const lane = (i - (towers.length - 1) / 2) * 0.85;
+    const lane = (i - (towers.length - 1) / 2) * 0.55; /* tight, never touching */
     const pts = [];
     const p0 = curve.getPointAt(T_JOIN);
     const dir0 = new THREE.Vector3(p0.x - tw.x, 0, p0.z - tw.z).normalize();
@@ -2101,9 +2253,8 @@ scene.add(coreTube, glowTube, hazeTube);
       const cp = curve.getPointAt(tt);
       const tan = curve.getTangentAt(tt);
       const side = new THREE.Vector3().crossVectors(tan, UP).normalize();
-      /* taper: the lanes converge right at the entrance */
-      const taper = k > SEG - 3 ? (SEG - k) / 3 : 1;
-      pts.push(new THREE.Vector3(cp.x + side.x * lane * taper, 0.5, cp.z + side.z * lane * taper));
+      /* the lanes stay strictly parallel all the way into the hall */
+      pts.push(new THREE.Vector3(cp.x + side.x * lane, 0.5, cp.z + side.z * lane));
     }
     const tCurve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.3);
     scene.add(new THREE.Mesh(new THREE.TubeGeometry(tCurve, 160, 0.15, 8, false), tribBeamMat(1.1, 2.0)));
@@ -2209,7 +2360,7 @@ const switchFlash = (() => {
       side: THREE.DoubleSide,
     })
   );
-  m.position.set(HQ_POS.x - 4.7, 1.6, HQ_POS.z);
+  m.position.set(HQ_POS.x + 4.8, 1.6, HQ_POS.z);
   m.rotation.y = Math.PI / 2;
   scene.add(m);
   return m;
@@ -2568,6 +2719,7 @@ const memberBlue = new THREE.Color(0x2b2bd6);
 const lightCoral = new THREE.Color(0xff8a8f);
 const lightCyan = new THREE.Color(0x6fd6ff);
 let firstFrame = true;
+let tickFansReset = false;
 
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -2593,17 +2745,18 @@ function tick() {
   headCore.position.copy(headPos);
   /* the glow is alive from the very first frame */
   const charge = 0.85 + 0.15 * THREE.MathUtils.clamp(p / MERGE_END, 0, 1);
-  /* hide the glow while it travels inside a building */
-  const vis = headVisibility(t);
+  /* the comet only exists once it leaves the HQ; hidden inside buildings */
+  const born = THREE.MathUtils.smoothstep(t, T_START - 0.002, T_START + 0.01);
+  const vis = headVisibility(t) * born;
   const pulse = (1 + Math.sin(time * 6) * 0.07) * charge * Math.max(vis, 0.001);
   headBig.scale.setScalar(13 * pulse);
   headMid.scale.setScalar(5.5 * pulse);
   headCore.scale.setScalar(2.0 * Math.max(charge, 0.5) * Math.max(vis, 0.001));
   beamLight.position.set(headPos.x, headPos.y + 3, headPos.z);
-  beamLight.intensity = 60 * charge * (0.35 + 0.65 * vis);
+  beamLight.intensity = 60 * charge * vis;
 
-  /* coral -> cyan hand-over flash at the HQ entrance */
-  const flashAmt = Math.exp(-Math.pow((t - T_SWITCH) * 80, 2));
+  /* birth flash at the HQ exit, right when the comet appears */
+  const flashAmt = Math.exp(-Math.pow((t - T_START) * 80, 2));
   switchFlash.material.opacity = flashAmt * 0.85;
   switchFlash.scale.setScalar(3 + 8 * THREE.MathUtils.clamp((t - T_SWITCH) * 30 + 0.5, 0, 1));
 
@@ -2633,6 +2786,27 @@ function tick() {
     const flap = Math.sin(time * d.flap) * 0.55;
     d.wings[0].rotation.x = flap;
     d.wings[1].rotation.x = -flap;
+  }
+
+  /* pedestrians stroll along the walkway, legs and arms swinging */
+  for (const w of walkers) {
+    const u0 = (time * w.speed + w.phase) % 2;
+    const u = u0 < 1 ? u0 : 2 - u0;
+    w.g.position.x = THREE.MathUtils.lerp(w.ax, w.bx, u);
+    w.g.position.z = THREE.MathUtils.lerp(w.az, w.bz, u);
+    w.g.position.y = Math.abs(Math.sin(time * 7 + w.phase * 9)) * 0.03;
+    const dir = u0 < 1 ? 1 : -1;
+    w.g.rotation.y = Math.atan2((w.bx - w.ax) * dir, (w.bz - w.az) * dir);
+    const swing = Math.sin(time * 7 + w.phase * 9);
+    w.g.userData.legs[0].rotation.x = swing * 0.55;
+    w.g.userData.legs[1].rotation.x = -swing * 0.55;
+    w.g.userData.arms[0].rotation.x = -swing * 0.32;
+    w.g.userData.arms[1].rotation.x = swing * 0.32;
+  }
+
+  /* some people talk with their hands */
+  for (const ge of gesturers) {
+    ge.pivot.rotation.x = -0.45 + Math.sin(time * 1.9 + ge.phase) * 0.3;
   }
   /* the light matches the line colour: coral before the HQ, cyan after */
   beamLight.color.lerpColors(lightCoral, lightCyan, THREE.MathUtils.smoothstep(t, T_SWITCH - 0.012, T_SWITCH + 0.012));
@@ -2666,6 +2840,37 @@ function tick() {
       THREE.MathUtils.lerp(14, 15.4, ke)
     );
     kickBall.rotation.z = -ke * 9;
+
+    /* celebration: shockwave + burst + flash + the crowd jumps up */
+    const gu = THREE.MathUtils.clamp((t - T_GOAL) / 0.05, 0, 1);
+    const active = gu > 0 && gu < 1;
+    goalFx.ring.material.opacity = active ? Math.pow(1 - gu, 1.6) * 0.95 : 0;
+    goalFx.ring.scale.setScalar(active ? 2 + gu * 18 : 0.001);
+    goalFx.light.intensity = active ? (1 - gu) * 50 : 0;
+    goalFx.burst.visible = active;
+    if (active) {
+      for (let i = 0; i < goalFx.data.length; i++) {
+        const d = goalFx.data[i];
+        const r = gu * d.speed;
+        goalFx.p.set(160.6 + d.dx * r, 1.2 + d.dy * r - 5 * gu * gu, 14 + d.dz * r);
+        goalFx.e.set(time * d.spin, time * d.spin * 0.7, 0);
+        goalFx.q.setFromEuler(goalFx.e);
+        goalFx.s.setScalar(Math.max((1 - gu) * 1.1, 0.001));
+        goalFx.m4.compose(goalFx.p, goalFx.q, goalFx.s);
+        goalFx.burst.setMatrixAt(i, goalFx.m4);
+      }
+      goalFx.burst.instanceMatrix.needsUpdate = true;
+    }
+    const hopAmp = Math.sin(Math.min(gu * 1.3, 1) * Math.PI);
+    if (hopAmp > 0.001) {
+      for (const f of stadiumFans) {
+        f.grp.position.y = f.baseY + Math.abs(Math.sin(time * 8 + f.phase)) * 0.42 * hopAmp;
+      }
+    } else if (tickFansReset) {
+      for (const f of stadiumFans) f.grp.position.y = f.baseY;
+      tickFansReset = false;
+    }
+    if (hopAmp > 0.001) tickFansReset = true;
   }
 
   for (let i = 0; i < phoneScreens.length; i++) {
@@ -2784,6 +2989,12 @@ window.__viz = {
   curve,
   progress,
   marks: { P_HQ, P_CLUB, P_PITCH, P_GOAL, P_APP, P_TRAIN, P_TROPHY, P_BANK, P_BANK_IN, P_BANK_OUT },
+  /* test helper: jump to a progress value with the camera snapped in place */
+  snap(p) {
+    progress.target = p;
+    progress.current = p;
+    firstFrame = true;
+  },
 };
 
 </script>

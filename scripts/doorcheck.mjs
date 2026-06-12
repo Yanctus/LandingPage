@@ -31,17 +31,16 @@ await new Promise((r) => setTimeout(r, 2000));
 const scrollH = await page.evaluate(() => document.body.scrollHeight - window.innerHeight);
 const marks = await page.evaluate(() => window.__viz.marks);
 console.log("marks:", JSON.stringify(marks));
-for (const s of [marks.P_HQ + 0.004, marks.P_PITCH + 0.052, marks.P_APP, 0.95, 1.0]) {
+for (const s of [marks.P_PITCH + 0.062, 1.0]) {
   await page.evaluate(
     (y, p) => {
       window.scrollTo(0, y);
-      /* skip the cinematic damping so shots show the settled state */
-      window.__viz.progress.current = p;
+      window.__viz.snap(p);
     },
     Math.round(scrollH * s),
     s
   );
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 1200));
   await page.screenshot({ path: `/tmp/shots/door_${String(Math.round(s * 1000)).padStart(3, "0")}.png` });
 }
 await browser.close();
