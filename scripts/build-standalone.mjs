@@ -44,3 +44,8 @@ out = out.replace(
 await mkdir(join(root, "dist"), { recursive: true });
 await writeFile(join(root, "dist/VereinsKern-Demo.html"), out);
 console.log("dist/VereinsKern-Demo.html written,", (out.length / 1024 / 1024).toFixed(2), "MB");
+
+/* second flavour: the warm "premium isometric SaaS miniature world" look */
+const premium = out.replace('<html lang="de">', '<html lang="de" data-theme="premium">');
+await writeFile(join(root, "dist/VereinsKern-Demo-Premium.html"), premium);
+console.log("dist/VereinsKern-Demo-Premium.html written,", (premium.length / 1024 / 1024).toFixed(2), "MB");

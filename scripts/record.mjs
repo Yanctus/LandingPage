@@ -7,7 +7,8 @@ const root = new URL("..", import.meta.url).pathname;
 const mime = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 const server = http
   .createServer(async (req, res) => {
-    const path = req.url === "/" ? "/index.html" : req.url.split("?")[0];
+    let path = req.url.split("?")[0];
+    if (path === "/") path = "/index.html";
     try {
       const data = await readFile(join(root, path));
       res.writeHead(200, { "Content-Type": mime[extname(path)] || "application/octet-stream" });
@@ -27,7 +28,7 @@ const browser = await puppeteer.launch({
 });
 const page = await browser.newPage();
 await page.setViewport({ width: 1280, height: 720 });
-await page.goto("http://localhost:8125/", { waitUntil: "networkidle0" });
+await page.goto("http://localhost:8125/" + (process.argv[2] || ""), { waitUntil: "networkidle0" });
 await new Promise((r) => setTimeout(r, 2000));
 
 const scrollH = await page.evaluate(() => document.body.scrollHeight - window.innerHeight);

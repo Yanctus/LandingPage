@@ -13,7 +13,8 @@ const mime = {
 
 const server = http
   .createServer(async (req, res) => {
-    const path = req.url === "/" ? "/index.html" : req.url.split("?")[0];
+    let path = req.url.split("?")[0];
+    if (path === "/") path = "/index.html";
     try {
       const data = await readFile(join(root, path));
       res.writeHead(200, { "Content-Type": mime[extname(path)] || "application/octet-stream" });
@@ -38,7 +39,7 @@ page.on("console", (m) => {
 });
 page.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}`));
 
-await page.goto("http://localhost:8123/", { waitUntil: "networkidle0", timeout: 30000 });
+await page.goto("http://localhost:8123/" + (process.argv[2] || ""), { waitUntil: "networkidle0", timeout: 30000 });
 await new Promise((r) => setTimeout(r, 2500));
 
 const scrollH = await page.evaluate(() => document.body.scrollHeight - window.innerHeight);
@@ -48,7 +49,7 @@ for (const s of stops) {
   await page.evaluate((y) => window.scrollTo(0, y), Math.round(scrollH * s));
   /* let the damped camera catch up */
   await new Promise((r) => setTimeout(r, 2600));
-  await page.screenshot({ path: `/tmp/shots/p${String(Math.round(s * 100)).padStart(3, "0")}.png` });
+  await page.screenshot({ path: `/tmp/shots/${process.argv[3] || "p"}${String(Math.round(s * 100)).padStart(3, "0")}.png` });
   console.log(`shot at ${s}`);
 }
 
