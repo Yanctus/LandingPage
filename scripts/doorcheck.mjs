@@ -31,7 +31,7 @@ await new Promise((r) => setTimeout(r, 2000));
 const scrollH = await page.evaluate(() => document.body.scrollHeight - window.innerHeight);
 const marks = await page.evaluate(() => window.__viz.marks);
 console.log("marks:", JSON.stringify(marks));
-for (const s of [marks.P_APP, marks.P_TROPHY, marks.P_PITCH]) {
+for (const s of [marks.P_HQ + 0.004, marks.P_PITCH + 0.052, marks.P_APP, 0.95, 1.0]) {
   await page.evaluate(
     (y, p) => {
       window.scrollTo(0, y);
